@@ -12,6 +12,17 @@ Client.getInstance().onConnected = () -> {
 };
 ```
 
+## 开始连接到服务器
+```haxe
+Client.getInstance().connect((bool:Bool)->{
+    if (bool) {
+        // 连接成功
+    } else {
+        // 连接失败
+    }
+});
+```
+
 ## 登陆服务器
 其中openid是由自已计算出来的唯一id（可使用用户注册的唯一标识），username为用户昵称
 ```haxe

@@ -1,5 +1,6 @@
 package hxonline;
 
+import hxonline.data.RoomData;
 import hxonline.data.ClientCallData;
 import haxe.io.Bytes;
 #if js
@@ -52,6 +53,11 @@ typedef RoomOption = {
  * 客户端
  */
 class Client {
+	/**
+	 * 调试模式
+	 */
+	public static var debug:Bool = true;
+
 	private static var _instance:Client;
 
 	/**
@@ -73,7 +79,27 @@ class Client {
 	/**
 	 * 登陆用户名
 	 */
+	public var userId:String = "";
+
+	/**
+	 * 登陆使用的昵称
+	 */
 	public var name:String = "";
+
+	/**
+	 * 服务器地址
+	 */
+	public var serverUrl:String;
+
+	/**
+	 * 服务器的验证APPKEY
+	 */
+	public var serverAppKey:String;
+
+	/**
+	 * 当前房间数据
+	 */
+	public var roomData:RoomData;
 
 	public function new() {}
 
@@ -100,10 +126,50 @@ class Client {
 	 * @param appkey 
 	 */
 	public function init(url:String, appkey:String):Void {
+		serverUrl = url;
+		serverAppKey = appkey;
+	}
+
+	/**
+	 * 关闭连接
+	 */
+	public function close():Void {
 		#if js
-		_socket = new WebSocket(url);
+		if (_socket != null) {
+			if (_socket.readyState != WebSocket.CLOSED) {
+				trace("[Client]close()");
+				_socket.close(1000, "主动退出");
+			}
+			_socket = null;
+		}
+		#end
+	}
+
+	private var _connectCb:Bool->Void;
+
+	/**
+	 * 连接服务器
+	 * @param cb 
+	 */
+	public function connect(cb:Bool->Void = null):Void {
+		_connectCb = cb;
+		#if js
+		if (_socket != null) {
+			if (_socket.readyState == WebSocket.CONNECTING) {
+				if (_connectCb != null) {
+					_connectCb(true);
+					_connectCb = null;
+				}
+				return;
+			}
+		}
+		_socket = new WebSocket(serverUrl);
 		_socket.onopen = function() {
 			onConnected();
+			if (_connectCb != null) {
+				_connectCb(true);
+				_connectCb = null;
+			}
 		};
 		_socket.onmessage = function(data:MessageEvent) {
 			if (data.data is String) {
@@ -113,7 +179,14 @@ class Client {
 				this.onBytes(data.data);
 			}
 		}
+		_socket.onerror = function() {
+			if (_connectCb != null) {
+				_connectCb(false);
+				_connectCb = null;
+			}
+		}
 		_socket.onclose = function() {
+			trace("[Client]onClosed()");
 			this.onClose();
 		}
 		#end
@@ -145,6 +218,10 @@ class Client {
 	 */
 	private function onMessageEvent(data:Dynamic):Void {
 		var opcode:OpCode = data.op;
+		if (debug) {
+			if (data != null)
+				trace(Json.stringify(data));
+		}
 		callOp(opcode, data.data);
 		this.onOpMessage(opcode, data.data);
 	}
@@ -156,13 +233,27 @@ class Client {
 	 */
 	public function login(userId:String, usreName:String, cb:ClientCallData->Void):Void {
 		this.name = usreName;
-		sendClientOp(Login, {
-			"openid": userId,
-			"username": usreName
-		}, function(data) {
-			this.uid = data.data.uid;
-			if (cb != null) {
-				cb(data);
+		this.userId = userId;
+		trace("又一次登陆了吗");
+		connect((bool) -> {
+			if (bool) {
+				sendClientOp(Login, {
+					"openid": userId,
+					"username": usreName
+				}, function(data) {
+					this.uid = data.data.uid;
+					if (cb != null) {
+						cb(data);
+					}
+				});
+			} else {
+				if (cb != null) {
+					cb({
+						code: -1,
+						op: Login,
+						data: "无法连接服务器"
+					});
+				}
 			}
 		});
 	}
@@ -267,11 +358,39 @@ class Client {
 	}
 
 	/**
+	 * 当前状态，自已是否房主
+	 * @return Bool
+	 */
+	public function isMatser():Bool {
+		if (this.roomData != null) {
+			return this.roomData.master.uid == this.roomData.self.uid;
+		}
+		return false;
+	}
+
+	/**
 	 * 获取房间信息
 	 * @param cb 
 	 */
 	public function getRoomData(cb:ClientCallData->Void):Void {
-		sendClientOp(GetRoomData, null, cb);
+		if (cb != null)
+			sendClientOp(GetRoomData, null, function(data) {
+				if (data.code == 0) {
+					// 定位是自已的用户数据
+					var list:Array<Dynamic> = data.data.users;
+					for (index => value in list) {
+						var state:Dynamic = Reflect.getProperty(data.data.usersState, value.uid);
+						value.state = state == null ? {} : state.data;
+						if (value.uid == this.uid) {
+							data.data.self = value;
+						}
+					}
+					roomData = data.data;
+				}
+				cb(data);
+			});
+		else
+			sendClientOp(GetRoomData);
 	}
 
 	/**
@@ -314,7 +433,7 @@ class Client {
 	 * @param op 
 	 * @param data 
 	 */
-	public function sendClientOp(op:OpCode, data:Dynamic, cb:ClientCallData->Void = null):Void {
+	public function sendClientOp(op:OpCode, data:Dynamic = null, cb:ClientCallData->Void = null):Void {
 		switch (mode) {
 			case TEXT:
 				var data = Json.stringify({
