@@ -1,6 +1,6 @@
-package socket;
+package hxonline;
 
-import socket.data.ClientCallData;
+import hxonline.data.ClientCallData;
 import haxe.io.Bytes;
 #if js
 import js.html.MessageEvent;

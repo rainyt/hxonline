@@ -1,4 +1,4 @@
-package socket.data;
+package hxonline.data;
 
 typedef ClientCallData = {
 	code:Int,

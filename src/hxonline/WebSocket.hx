@@ -1,4 +1,4 @@
-package socket;
+package hxonline;
 
 #if js
 typedef WebSocket = js.html.WebSocket;
