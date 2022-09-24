@@ -202,6 +202,49 @@ class Client {
 		if (isError) {
 			opcode = data.op;
 		}
+		switch opcode {
+			case Error:
+			case Message:
+			case CreateRoom:
+			case JoinRoom:
+			case ChangedRoom:
+			case GetRoomData:
+			case StartFrameSync:
+			case StopFrameSync:
+			case UploadFrame:
+			case Login:
+			case FData:
+			case RoomMessage:
+			case JoinRoomClient:
+			case ExitRoomClient:
+			case OutOnlineRoomClient:
+			case ExitRoom:
+			case MatchUser:
+			case UpdateUserData:
+			case GetRoomOldMessage:
+			case UpdateRoomCustomData:
+			case UpdateRoomOption:
+			case KickOut:
+			case SelfKickOut:
+			case GetFrameAt:
+			case SetRoomState:
+			case RoomStateUpdate:
+				// 房间状态更新时
+				if (roomData == null)
+					return;
+				this.updateData(roomData.state, data.data);
+			case SetClientState:
+			case ClientStateUpdate:
+				// 客户端状态更新时
+				if (roomData == null)
+					return;
+				for (user in roomData.users) {
+					if (user.uid == data.uid) {
+						this.updateData(user.state, data.data);
+						break;
+					}
+				}
+		}
 		if (_opCallBack.exists(opcode)) {
 			_opCallBack.get(opcode)({
 				code: isError ? 1 : 0,
@@ -209,6 +252,19 @@ class Client {
 				op: opcode
 			});
 			_opCallBack.remove(opcode);
+		}
+	}
+
+	/**
+	 * 更新数据
+	 * @param rootData 
+	 * @param data 
+	 */
+	private function updateData(rootData:Dynamic, data:Dynamic):Void {
+		trace("更新数据", rootData, data);
+		var keys = Reflect.fields(data);
+		for (v in keys) {
+			Reflect.setProperty(rootData, v, Reflect.getProperty(data, v));
 		}
 	}
 
