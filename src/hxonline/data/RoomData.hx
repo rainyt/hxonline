@@ -19,6 +19,7 @@ typedef RoomData = {
  */
 typedef ClientData = {
 	uid:Int,
+	name:String,
 	data:Dynamic,
 	state:Dynamic
 }

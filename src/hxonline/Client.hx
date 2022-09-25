@@ -37,6 +37,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var RoomStateUpdate = 24; // 房间状态更新
 	var SetClientState = 25; // 设置用户状态
 	var ClientStateUpdate = 26; // 用户状态发生变化
+	var FrameSyncReady = 27; // 帧同步准备传输
 }
 
 enum DataMode {
@@ -99,7 +100,7 @@ class Client {
 	/**
 	 * 当前房间数据
 	 */
-	public var roomData:RoomData;
+	public static var roomData:RoomData;
 
 	public function new() {}
 
@@ -232,7 +233,7 @@ class Client {
 				// 房间状态更新时
 				if (roomData == null)
 					return;
-				this.updateData(roomData.state, data.data);
+				this.updateData(roomData.state, data);
 			case SetClientState:
 			case ClientStateUpdate:
 				// 客户端状态更新时
@@ -244,6 +245,7 @@ class Client {
 						break;
 					}
 				}
+			default:
 		}
 		if (_opCallBack.exists(opcode)) {
 			_opCallBack.get(opcode)({
@@ -261,7 +263,6 @@ class Client {
 	 * @param data 
 	 */
 	private function updateData(rootData:Dynamic, data:Dynamic):Void {
-		trace("更新数据", rootData, data);
 		var keys = Reflect.fields(data);
 		for (v in keys) {
 			Reflect.setProperty(rootData, v, Reflect.getProperty(data, v));
@@ -337,8 +338,17 @@ class Client {
 	 * @param data 
 	 * @param cb 
 	 */
-	public function setRoomState(data:Dynamic, cb:ClientCallData->Void = null):Void {
-		sendClientOp(SetRoomState, data, cb);
+	public function setRoomState(setData:Dynamic, cb:ClientCallData->Void = null):Void {
+		sendClientOp(SetRoomState, setData, function(data) {
+			if (data.code == 0) {
+				if (roomData != null) {
+					this.updateData(roomData.state, setData);
+				}
+			}
+			if (cb != null) {
+				cb(data);
+			}
+		});
 	}
 
 	/**
@@ -346,8 +356,17 @@ class Client {
 	 * @param data 
 	 * @param cb 
 	 */
-	public function setClientState(data:Dynamic, cb:ClientCallData->Void = null):Void {
-		sendClientOp(SetClientState, data, cb);
+	public function setClientState(setData:Dynamic, cb:ClientCallData->Void = null):Void {
+		sendClientOp(SetClientState, setData, function(data) {
+			if (data.code == 0) {
+				if (roomData != null) {
+					this.updateData(roomData.self.state, setData);
+				}
+			}
+			if (cb != null) {
+				cb(data);
+			}
+		});
 	}
 
 	/**
@@ -418,8 +437,27 @@ class Client {
 	 * @return Bool
 	 */
 	public function isMatser():Bool {
-		if (this.roomData != null) {
-			return this.roomData.master.uid == this.roomData.self.uid;
+		if (roomData != null) {
+			return roomData.master.uid == roomData.self.uid;
+		}
+		return false;
+	}
+
+	/**
+	 * 检测所有的客户端的状态值是否等于value
+	 * @param stateKey 
+	 * @param value 
+	 * @return Bool
+	 */
+	public function checkAllClientState(stateKey:String, value:Dynamic):Bool {
+		if (roomData != null) {
+			var counts = 0;
+			for (v in roomData.users) {
+				if (Reflect.getProperty(v.state, stateKey) == value) {
+					counts++;
+				}
+			}
+			return counts == roomData.users.length;
 		}
 		return false;
 	}
@@ -555,4 +593,30 @@ class Client {
 	 * @param data 
 	 */
 	dynamic public function onOpMessage(op:OpCode, data:Dynamic):Void {}
+
+	/**
+	 * 锁定房间
+	 */
+	public function lockRoom() {}
+
+	/**
+	 * 解锁房间
+	 */
+	public function unlockRoom() {}
+
+	/**
+	 * 获取UID在users里的索引
+	 * @param arg0 
+	 * @return Int
+	 */
+	public function getUidIndex(arg0:Null<Int>):Int {
+		if (roomData != null) {
+			for (i => user in roomData.users) {
+				if (user.uid == arg0) {
+					return i;
+				}
+			}
+		}
+		return -1;
+	}
 }
