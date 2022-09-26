@@ -1,5 +1,6 @@
 package hxonline;
 
+import hxonline.data.MatchOption;
 import hxonline.data.RoomData;
 import hxonline.data.ClientCallData;
 import haxe.io.Bytes;
@@ -38,6 +39,8 @@ enum abstract OpCode(Int) from Int to Int {
 	var SetClientState = 25; // 设置用户状态
 	var ClientStateUpdate = 26; // 用户状态发生变化
 	var FrameSyncReady = 27; // 帧同步准备传输
+	var ResetRoom = 28; // 重置房间状态信息
+	var Matched = 29; // 匹配成功
 }
 
 enum DataMode {
@@ -149,6 +152,14 @@ class Client {
 	private var _connectCb:Bool->Void;
 
 	/**
+	 * 是否连接中
+	 * @return Bool
+	 */
+	public function connected():Bool {
+		return _socket != null && _socket.readyState != WebSocket.CLOSED;
+	}
+
+	/**
 	 * 连接服务器
 	 * @param cb 
 	 */
@@ -156,7 +167,8 @@ class Client {
 		_connectCb = cb;
 		#if js
 		if (_socket != null) {
-			if (_socket.readyState == WebSocket.CONNECTING) {
+			if (_socket.readyState == WebSocket.OPEN) {
+				trace("重复登陆");
 				if (_connectCb != null) {
 					_connectCb(true);
 					_connectCb = null;
@@ -188,6 +200,7 @@ class Client {
 		}
 		_socket.onclose = function() {
 			trace("[Client]onClosed()");
+			roomData = null;
 			this.onClose();
 		}
 		#end
@@ -220,6 +233,7 @@ class Client {
 			case ExitRoomClient:
 			case OutOnlineRoomClient:
 			case ExitRoom:
+				roomData = null;
 			case MatchUser:
 			case UpdateUserData:
 			case GetRoomOldMessage:
@@ -276,7 +290,7 @@ class Client {
 	private function onMessageEvent(data:Dynamic):Void {
 		var opcode:OpCode = data.op;
 		if (debug) {
-			if (data != null)
+			if (data != null && opcode != FData)
 				trace(Json.stringify(data));
 		}
 		callOp(opcode, data.data);
@@ -291,7 +305,6 @@ class Client {
 	public function login(userId:String, usreName:String, cb:ClientCallData->Void):Void {
 		this.name = usreName;
 		this.userId = userId;
-		trace("又一次登陆了吗");
 		connect((bool) -> {
 			if (bool) {
 				sendClientOp(Login, {
@@ -510,6 +523,22 @@ class Client {
 	 */
 	public function uploadFrame(data:Dynamic):Void {
 		sendClientOp(UploadFrame, data);
+	}
+
+	/**
+	 * 重置房间数据，新的房间数据，请通过`getRoomData`接口获得
+	 * @param cb 
+	 */
+	public function resetRoom(cb:ClientCallData->Void) {
+		sendClientOp(ResetRoom, null, cb);
+	}
+
+	/**
+	 * 匹配用户
+	 * @param cb 
+	 */
+	public function matchUser(option:MatchOption, cb:ClientCallData->Void) {
+		sendClientOp(MatchUser, option, cb);
 	}
 
 	/**
