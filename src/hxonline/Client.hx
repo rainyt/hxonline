@@ -41,6 +41,8 @@ enum abstract OpCode(Int) from Int to Int {
 	var FrameSyncReady = 27; // 帧同步准备传输
 	var ResetRoom = 28; // 重置房间状态信息
 	var Matched = 29; // 匹配成功
+	var LockRoom = 30; // 锁定房间
+	var UnlockRoom = 31; // 取消锁定房间
 }
 
 enum DataMode {
@@ -54,7 +56,7 @@ typedef RoomOption = {
 }
 
 /**
- * 客户端
+ * go-websocket-server实时同步服务器客户端
  */
 class Client {
 	/**
@@ -457,6 +459,22 @@ class Client {
 	}
 
 	/**
+	 * 锁定房间，锁定后，外面的人将无法加入
+	 * @param cb 
+	 */
+	public function lockRoom(cb:ClientCallData->Void = null):Void {
+		sendClientOp(LockRoom, null, cb);
+	}
+
+	/**
+	 * 解锁房间，解锁后，房间才允许加入
+	 * @param cb 
+	 */
+	public function unlockRoom(cb:ClientCallData->Void = null):Void {
+		sendClientOp(UnlockRoom, null, cb);
+	}
+
+	/**
 	 * 检测所有的客户端的状态值是否等于value
 	 * @param stateKey 
 	 * @param value 
@@ -622,16 +640,6 @@ class Client {
 	 * @param data 
 	 */
 	dynamic public function onOpMessage(op:OpCode, data:Dynamic):Void {}
-
-	/**
-	 * 锁定房间
-	 */
-	public function lockRoom() {}
-
-	/**
-	 * 解锁房间
-	 */
-	public function unlockRoom() {}
 
 	/**
 	 * 获取UID在users里的索引
