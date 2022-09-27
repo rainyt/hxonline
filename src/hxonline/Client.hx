@@ -45,6 +45,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var UnlockRoom = 31; // 取消锁定房间
 	var MatchRoom = 32; // 匹配房间
 	var SetRoomMatchOption = 33; // 设置房间的匹配参数
+	var UpdateRoomUserData = 34; // 更新房间用户数据
 }
 
 enum DataMode {
@@ -259,6 +260,18 @@ class Client {
 				roomData = null;
 			case MatchUser:
 			case UpdateUserData:
+			case UpdateRoomUserData:
+				if (roomData != null) {
+					for (user in roomData.users) {
+						if (user.uid == data.uid) {
+							if (user.data == null) {
+								user.data = {};
+							}
+							this.updateData(user.data, data.data);
+							break;
+						}
+					}
+				}
 			case GetRoomOldMessage:
 			case UpdateRoomCustomData:
 			case UpdateRoomOption:
@@ -301,6 +314,8 @@ class Client {
 	 * @param data 
 	 */
 	private function updateData(rootData:Dynamic, data:Dynamic):Void {
+		if (rootData == null || data == null)
+			return;
 		var keys = Reflect.fields(data);
 		for (v in keys) {
 			Reflect.setProperty(rootData, v, Reflect.getProperty(data, v));
@@ -605,6 +620,8 @@ class Client {
 	 * @param data 
 	 */
 	public function sendClientOp(op:OpCode, data:Dynamic = null, cb:ClientCallData->Void = null):Void {
+		if (!connected())
+			return;
 		switch (mode) {
 			case TEXT:
 				var data = Json.stringify({
