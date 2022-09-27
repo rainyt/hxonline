@@ -43,6 +43,8 @@ enum abstract OpCode(Int) from Int to Int {
 	var Matched = 29; // 匹配成功
 	var LockRoom = 30; // 锁定房间
 	var UnlockRoom = 31; // 取消锁定房间
+	var MatchRoom = 32; // 匹配房间
+	var SetRoomMatchOption = 33; // 设置房间的匹配参数
 }
 
 enum DataMode {
@@ -232,7 +234,26 @@ class Client {
 			case FData:
 			case RoomMessage:
 			case JoinRoomClient:
+				if (roomData != null) {
+					var isExsit = false;
+					for (user in roomData.users) {
+						if (user.uid == data.uid) {
+							isExsit = true;
+							break;
+						}
+					}
+					if (!isExsit)
+						roomData.users.push(data);
+				}
 			case ExitRoomClient:
+				if (roomData != null) {
+					for (index => user in roomData.users) {
+						if (user.uid == data.uid) {
+							roomData.users.remove(roomData.users[index]);
+							break;
+						}
+					}
+				}
 			case OutOnlineRoomClient:
 			case ExitRoom:
 				roomData = null;
@@ -247,20 +268,21 @@ class Client {
 			case SetRoomState:
 			case RoomStateUpdate:
 				// 房间状态更新时
-				if (roomData == null)
-					return;
-				this.updateData(roomData.state, data);
+				if (roomData != null)
+					this.updateData(roomData.state, data);
 			case SetClientState:
 			case ClientStateUpdate:
 				// 客户端状态更新时
-				if (roomData == null)
-					return;
-				for (user in roomData.users) {
-					if (user.uid == data.uid) {
-						this.updateData(user.state, data.data);
-						break;
+				if (roomData != null)
+					for (user in roomData.users) {
+						if (user.uid == data.uid) {
+							if (user.state == null) {
+								user.state = {};
+							}
+							this.updateData(user.state, data.data);
+							break;
+						}
 					}
-				}
 			default:
 		}
 		if (_opCallBack.exists(opcode)) {
@@ -501,16 +523,16 @@ class Client {
 		if (cb != null)
 			sendClientOp(GetRoomData, null, function(data) {
 				if (data.code == 0) {
+					roomData = data.data;
 					// 定位是自已的用户数据
 					var list:Array<Dynamic> = data.data.users;
 					for (index => value in list) {
 						var state:Dynamic = Reflect.getProperty(data.data.usersState, value.uid);
-						value.state = state == null ? {} : state.data;
+						value.state = state == null ? {} : state;
 						if (value.uid == this.uid) {
 							data.data.self = value;
 						}
 					}
-					roomData = data.data;
 				}
 				cb(data);
 			});
@@ -557,6 +579,14 @@ class Client {
 	 */
 	public function matchUser(option:MatchOption, cb:ClientCallData->Void) {
 		sendClientOp(MatchUser, option, cb);
+	}
+
+	/**
+	 * 匹配房间，如果不存在对应的房间时，则自动创建房间
+	 * @param cb 
+	 */
+	public function matchRoom(option:MatchOption, cb:ClientCallData->Void) {
+		sendClientOp(MatchRoom, option, cb);
 	}
 
 	/**
