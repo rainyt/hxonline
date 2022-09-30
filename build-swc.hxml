@@ -1,4 +1,6 @@
 --swf bin/hxonline.swc
 --class-path src
 --class-path main
+--library haxe-ws
+-swf-version 11
 --main Main

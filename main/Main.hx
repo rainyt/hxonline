@@ -6,6 +6,7 @@ import hxonline.WebSocket;
 
 class Main {
 	static function main() {
+        #if cpp
 		Client.getInstance().init("ws://127.0.0.1:8888", null);
 		Client.getInstance().login("1", "左眼", (data) -> {
 			trace("登陆结果：", data);
@@ -18,6 +19,8 @@ class Main {
             Client.getInstance().process();
             Sys.sleep(0.1);
         }
+        #end
+
         #end
 	}
 }
