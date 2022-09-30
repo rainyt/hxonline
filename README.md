@@ -2,9 +2,12 @@
 与`go-websocket-server`构造的服务器配合的api
 
 ## 平台支持
-- [x]Js
-- [x]Cpp
-- [x]Flash(As3)
+-[x] Js（Html5/JavaScript）
+-[x] Cpp（HxCpp）
+-[x] ActionScript3 (AdobeAIR)
+
+## 依赖库
+当编译到cpp和as3时，需要使用`haxe-ws`库。
 
 ## 初始化服务器
 ```haxe
