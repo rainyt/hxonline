@@ -1,0 +1,4 @@
+--swf bin/hxonline.swc
+--class-path src
+--class-path main
+--main Main

@@ -1,5 +1,6 @@
 package hxonline;
 
+import haxe.Exception;
 import hxonline.data.MatchOption;
 import hxonline.data.RoomData;
 import hxonline.data.ClientCallData;
@@ -135,6 +136,7 @@ class Client {
 	 * @param appkey 
 	 */
 	public function init(url:String, appkey:String):Void {
+		trace("[hxonline]init url:" + url);
 		serverUrl = url;
 		serverAppKey = appkey;
 	}
@@ -161,7 +163,13 @@ class Client {
 	 * @return Bool
 	 */
 	public function connected():Bool {
+		#if js
 		return _socket != null && _socket.readyState != WebSocket.CLOSED;
+		#elseif cpp
+		return false;
+		#else
+		return false;
+		#end
 	}
 
 	/**
@@ -610,7 +618,9 @@ class Client {
 	 */
 	private function sendData(data:Dynamic):Void {
 		#if js
-		_socket.send(data);
+		try {
+			_socket.send(data);
+		} catch (e:Exception) {}
 		#end
 	}
 
@@ -629,7 +639,7 @@ class Client {
 					data: data
 				});
 				sendData(data);
-				trace("TEXT发送长度：", Bytes.ofString(data).length);
+			// trace("TEXT发送长度：", Bytes.ofString(data).length);
 			case BYTES:
 				if (data is Bytes) {
 					var bdata:Bytes = data;
