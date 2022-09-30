@@ -116,7 +116,7 @@ class Client {
 	/**
 	 * 连接器
 	 */
-	#if (js || cpp)
+	#if (js || cpp || flash)
 	private var _socket:WebSocket;
 	#end
 
@@ -145,9 +145,9 @@ class Client {
 	 * 关闭连接
 	 */
 	public function close():Void {
-		#if (js || cpp)
+		#if (js || cpp || flash)
 		if (_socket != null) {
-			#if cpp
+			#if (cpp || flash)
 			if (_socket.readyState == Closed) {
 				trace("[Client]close()");
 				_socket.close();
@@ -172,7 +172,7 @@ class Client {
 	public function connected():Bool {
 		#if js
 		return _socket != null && _socket.readyState != WebSocket.CLOSED;
-		#elseif cpp
+		#elseif (flash || cpp)
 		return _socket != null && _socket.readyState != Closed;
 		#else
 		return false;
@@ -184,6 +184,7 @@ class Client {
 	 * @param cb 
 	 */
 	public function connect(cb:Bool->Void = null):Void {
+		trace("connecting");
 		_connectCb = cb;
 		#if js
 		if (_socket != null) {
@@ -223,7 +224,7 @@ class Client {
 			roomData = null;
 			this.onClose();
 		}
-		#elseif cpp
+		#elseif (cpp || flash)
 		if (_socket != null) {
 			if (_socket.readyState == Open) {
 				if (_connectCb != null) {
@@ -235,6 +236,7 @@ class Client {
 		}
 		_socket = WebSocket.create(serverUrl);
 		_socket.onopen = function() {
+			trace("open");
 			onConnected();
 			if (_connectCb != null) {
 				_connectCb(true);
@@ -249,6 +251,7 @@ class Client {
 			this.onText(data);
 		}
 		_socket.onerror = function(message) {
+			trace("error:" + message);
 			if (_connectCb != null) {
 				_connectCb(false);
 				_connectCb = null;
@@ -259,6 +262,13 @@ class Client {
 			roomData = null;
 			this.onClose();
 		}
+		#end
+	}
+
+	public function process():Void {
+		#if (cpp || flash)
+		if (_socket != null)
+			_socket.process();
 		#end
 	}
 
@@ -664,7 +674,7 @@ class Client {
 		try {
 			_socket.send(data);
 		} catch (e:Exception) {}
-		#elseif cpp
+		#elseif (cpp || flash)
 		try {
 			if (data is String)
 				_socket.sendString(data)

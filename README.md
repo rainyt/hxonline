@@ -4,6 +4,7 @@
 ## 平台支持
 - [x]Js
 - [x]Cpp
+- [x]Flash(As3)
 
 ## 初始化服务器
 ```haxe
