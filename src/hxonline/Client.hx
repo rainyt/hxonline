@@ -257,7 +257,7 @@ class Client {
 				_connectCb = null;
 			}
 		}
-		_socket.onclose = function() {
+		_socket.onclose = function(?e:Null<Dynamic>) {
 			trace("[Client]onClosed()");
 			roomData = null;
 			this.onClose();
