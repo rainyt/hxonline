@@ -1,6 +1,10 @@
 ## hxonline
 与`go-websocket-server`构造的服务器配合的api
 
+## 平台支持
+- [x]Js
+- [x]Cpp
+
 ## 初始化服务器
 ```haxe
 Client.getInstance().init("ws://127.0.0.1:8888", "Egdts8");

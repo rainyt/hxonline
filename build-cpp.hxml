@@ -1,0 +1,5 @@
+--class-path main
+--class-path src
+--main Main
+--library haxe-ws
+--cpp bin/cpp

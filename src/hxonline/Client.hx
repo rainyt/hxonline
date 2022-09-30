@@ -116,7 +116,7 @@ class Client {
 	/**
 	 * 连接器
 	 */
-	#if js
+	#if (js || cpp)
 	private var _socket:WebSocket;
 	#end
 
@@ -145,12 +145,19 @@ class Client {
 	 * 关闭连接
 	 */
 	public function close():Void {
-		#if js
+		#if (js || cpp)
 		if (_socket != null) {
+			#if cpp
+			if (_socket.readyState == Closed) {
+				trace("[Client]close()");
+				_socket.close();
+			}
+			#else
 			if (_socket.readyState != WebSocket.CLOSED) {
 				trace("[Client]close()");
 				_socket.close(1000, "主动退出");
 			}
+			#end
 			_socket = null;
 		}
 		#end
@@ -166,7 +173,7 @@ class Client {
 		#if js
 		return _socket != null && _socket.readyState != WebSocket.CLOSED;
 		#elseif cpp
-		return false;
+		return _socket != null && _socket.readyState != Closed;
 		#else
 		return false;
 		#end
@@ -206,6 +213,42 @@ class Client {
 			}
 		}
 		_socket.onerror = function() {
+			if (_connectCb != null) {
+				_connectCb(false);
+				_connectCb = null;
+			}
+		}
+		_socket.onclose = function() {
+			trace("[Client]onClosed()");
+			roomData = null;
+			this.onClose();
+		}
+		#elseif cpp
+		if (_socket != null) {
+			if (_socket.readyState == Open) {
+				if (_connectCb != null) {
+					_connectCb(true);
+					_connectCb = null;
+				}
+				return;
+			}
+		}
+		_socket = WebSocket.create(serverUrl);
+		_socket.onopen = function() {
+			onConnected();
+			if (_connectCb != null) {
+				_connectCb(true);
+				_connectCb = null;
+			}
+		};
+		_socket.onmessageBytes = function(data) {
+			this.onBytes(data);
+		}
+		_socket.onmessageString = function(data) {
+			this.onMessageEvent(data);
+			this.onText(data);
+		}
+		_socket.onerror = function(message) {
 			if (_connectCb != null) {
 				_connectCb(false);
 				_connectCb = null;
@@ -620,6 +663,13 @@ class Client {
 		#if js
 		try {
 			_socket.send(data);
+		} catch (e:Exception) {}
+		#elseif cpp
+		try {
+			if (data is String)
+				_socket.sendString(data)
+			else
+				_socket.sendBytes(data);
 		} catch (e:Exception) {}
 		#end
 	}
