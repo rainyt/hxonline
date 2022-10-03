@@ -47,6 +47,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var MatchRoom = 32; // 匹配房间
 	var SetRoomMatchOption = 33; // 设置房间的匹配参数
 	var UpdateRoomUserData = 34; // 更新房间用户数据
+	var GetRoomList = 35; // 获取房间列表
 }
 
 enum DataMode {
@@ -135,10 +136,10 @@ class Client {
 	 * @param url 
 	 * @param appkey 
 	 */
-	public function init(url:String, appkey:String):Void {
+	public function init(url:String, appid:String):Void {
 		trace("[hxonline]init url:" + url);
 		serverUrl = url;
-		serverAppKey = appkey;
+		serverAppKey = appid;
 	}
 
 	/**
@@ -409,7 +410,8 @@ class Client {
 			if (bool) {
 				sendClientOp(Login, {
 					"openid": userId,
-					"username": usreName
+					"username": usreName,
+					"appid": serverAppKey
 				}, function(data) {
 					this.uid = data.data.uid;
 					if (cb != null) {
@@ -520,9 +522,10 @@ class Client {
 	 * @param roomid 
 	 * @param cb 
 	 */
-	public function joinRoom(roomid:Int, cb:ClientCallData->Void):Void {
+	public function joinRoom(roomid:Int, cb:ClientCallData->Void, password:String = null):Void {
 		sendClientOp(JoinRoom, {
-			id: roomid
+			id: roomid,
+			password: password
 		}, cb);
 	}
 
@@ -772,5 +775,18 @@ class Client {
 			}
 		}
 		return -1;
+	}
+
+	/**
+	 * 获取房间列表信息
+	 * @param page 
+	 * @param counts 
+	 * @param cb 
+	 */
+	public function getRoomList(page:Int, counts:Int, cb:ClientCallData->Void):Void {
+		sendClientOp(GetRoomList, {
+			page: page,
+			counts: counts
+		}, cb);
 	}
 }
