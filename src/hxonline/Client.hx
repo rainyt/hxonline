@@ -248,7 +248,7 @@ class Client {
 			this.onBytes(data);
 		}
 		_socket.onmessageString = function(data) {
-			this.onMessageEvent(data);
+			this.onMessageEvent(Json.parse(data));
 			this.onText(data);
 		}
 		_socket.onerror = function(message) {
@@ -648,7 +648,7 @@ class Client {
 	 * 重置房间数据，新的房间数据，请通过`getRoomData`接口获得
 	 * @param cb 
 	 */
-	public function resetRoom(cb:ClientCallData->Void) {
+	public function resetRoom(cb:ClientCallData->Void = null) {
 		sendClientOp(ResetRoom, null, cb);
 	}
 

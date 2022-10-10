@@ -7,7 +7,7 @@
 - [x] ActionScript3 (AdobeAIR)
 
 ## 依赖库
-当编译到cpp和as3时，需要使用`colyseus-websocke`库。
+当编译到cpp和as3时，需要使用`colyseus-websocket`库。
 
 ## 初始化服务器
 ```haxe

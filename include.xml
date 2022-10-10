@@ -3,4 +3,6 @@
 
 	<source path='src' />
 
+	<haxelib name="colyseus-websocket" if="cpp"/>
+
 </project>
