@@ -1,5 +1,6 @@
 package hxonline;
 
+import hxonline.data.UserUIDData;
 import haxe.Exception;
 import hxonline.data.MatchOption;
 import hxonline.data.RoomData;
@@ -48,6 +49,12 @@ enum abstract OpCode(Int) from Int to Int {
 	var SetRoomMatchOption = 33; // 设置房间的匹配参数
 	var UpdateRoomUserData = 34; // 更新房间用户数据
 	var GetRoomList = 35; // 获取房间列表
+	var SendServerMsg = 36; // 发送全服消息
+	var GetServerMsg = 37; // 接收到全服消息
+	var ListenerServerMsg = 38; // 侦听全服消息
+	var CannelListenerServerMsg = 39; // 取消侦听全服消息
+	var GetUserDataByUID = 40; // 根据UID获取用户数据
+	var GetServerOldMsg = 41; // 获取历史全服消息
 }
 
 enum DataMode {
@@ -112,7 +119,7 @@ class Client {
 	 */
 	public static var roomData:RoomData;
 
-	public function new() {}
+	private function new() {}
 
 	/**
 	 * 连接器
@@ -137,7 +144,7 @@ class Client {
 	 * @param appkey 
 	 */
 	public function init(url:String, appid:String):Void {
-		trace("[hxonline]init url:" + url);
+		trace("[hxonline]init url:" + url, appid);
 		serverUrl = url;
 		serverAppKey = appid;
 	}
@@ -200,7 +207,8 @@ class Client {
 		}
 		_socket = new WebSocket(serverUrl);
 		_socket.onopen = function() {
-			onConnected();
+			if (onConnected != null)
+				onConnected();
 			if (_connectCb != null) {
 				_connectCb(true);
 				_connectCb = null;
@@ -208,10 +216,13 @@ class Client {
 		};
 		_socket.onmessage = function(data:MessageEvent) {
 			if (data.data is String) {
-				this.onMessageEvent(Json.parse(data.data));
-				this.onText(data.data);
+				if (onMessageEvent != null)
+					this.onMessageEvent(Json.parse(data.data));
+				if (onText != null)
+					this.onText(data.data);
 			} else {
-				this.onBytes(data.data);
+				if (onBytes != null)
+					this.onBytes(data.data);
 			}
 		}
 		_socket.onerror = function() {
@@ -223,7 +234,8 @@ class Client {
 		_socket.onclose = function() {
 			trace("[Client]onClosed()");
 			roomData = null;
-			this.onClose();
+			if (onClose != null)
+				this.onClose();
 		}
 		#elseif (cpp || flash)
 		if (_socket != null) {
@@ -238,18 +250,22 @@ class Client {
 		_socket = WebSocket.create(serverUrl);
 		_socket.onopen = function() {
 			trace("open");
-			onConnected();
+			if (onConnected != null)
+				onConnected();
 			if (_connectCb != null) {
 				_connectCb(true);
 				_connectCb = null;
 			}
 		};
 		_socket.onmessageBytes = function(data) {
-			this.onBytes(data);
+			if (onBytes != null)
+				this.onBytes(data);
 		}
 		_socket.onmessageString = function(data) {
-			this.onMessageEvent(Json.parse(data));
-			this.onText(data);
+			if (onMessageEvent != null)
+				this.onMessageEvent(Json.parse(data));
+			if (onText != null)
+				this.onText(data);
 		}
 		_socket.onerror = function(message) {
 			trace("error:" + message);
@@ -261,7 +277,8 @@ class Client {
 		_socket.onclose = function(?e:Null<Dynamic>) {
 			trace("[Client]onClosed()");
 			roomData = null;
-			this.onClose();
+			if (this.onClose != null)
+				this.onClose();
 		}
 		#end
 	}
@@ -308,6 +325,7 @@ class Client {
 					if (!isExsit)
 						roomData.users.push(data);
 				}
+				UserUIDData.getInstance().cacheUserData(data);
 			case ExitRoomClient:
 				if (roomData != null) {
 					for (index => user in roomData.users) {
@@ -330,6 +348,7 @@ class Client {
 								user.data = {};
 							}
 							this.updateData(user.data, data.data);
+							UserUIDData.getInstance().cacheUserData(user);
 							break;
 						}
 					}
@@ -395,7 +414,8 @@ class Client {
 				trace(Json.stringify(data));
 		}
 		callOp(opcode, data.data);
-		this.onOpMessage(opcode, data.data);
+		if (onOpMessage != null)
+			this.onOpMessage(opcode, data.data);
 	}
 
 	/**
@@ -436,6 +456,10 @@ class Client {
 	 * @param cb 
 	 */
 	public function updateUserData(data:Dynamic, cb:ClientCallData->Void = null):Void {
+		if (roomData != null) {
+			this.updateData(roomData.self.data, data);
+			UserUIDData.getInstance().cacheUserData(roomData.self);
+		}
 		sendClientOp(UpdateUserData, data, cb);
 	}
 
@@ -446,6 +470,42 @@ class Client {
 	 */
 	public function sendRoomMessage(data:Dynamic, cb:ClientCallData->Void = null):Void {
 		sendClientOp(RoomMessage, data, cb);
+	}
+
+	/**
+	 * 发送全服消息
+	 * @param data 
+	 * @param cb 
+	 */
+	public function sendServerMessage(data:Dynamic, cb:ClientCallData->Void = null):Void {
+		sendClientOp(SendServerMsg, data, cb);
+	}
+
+	/**
+	 * 获取服务器历史消息
+	 * @param counts 
+	 * @param cb 
+	 */
+	public function getServerOldMsg(counts:Int, cb:ClientCallData->Void = null):Void {
+		sendClientOp(GetServerOldMsg, {
+			counts: counts
+		}, cb);
+	}
+
+	/**
+	 * 侦听全服消息
+	 * @param cb 
+	 */
+	public function listenerServerMessage(cb:ClientCallData->Void = null):Void {
+		sendClientOp(ListenerServerMsg, null, cb);
+	}
+
+	/**
+	 * 取消侦听全服消息
+	 * @param cb 
+	 */
+	public function removeServerMessage(cb:ClientCallData->Void = null):Void {
+		sendClientOp(CannelListenerServerMsg, null, cb);
 	}
 
 	/**
@@ -611,6 +671,7 @@ class Client {
 						if (value.uid == this.uid) {
 							data.data.self = value;
 						}
+						UserUIDData.getInstance().cacheUserData(value);
 					}
 				}
 				cb(data);
@@ -679,9 +740,11 @@ class Client {
 		} catch (e:Exception) {}
 		#elseif (cpp || flash)
 		try {
-			if (data is String)
-				_socket.sendString(data)
-			else
+			if (data is String) {
+				if (debug)
+					trace('send data:', data);
+				_socket.sendString(data);
+			} else
 				_socket.sendBytes(data);
 		} catch (e:Exception) {}
 		#end
@@ -695,6 +758,9 @@ class Client {
 	public function sendClientOp(op:OpCode, data:Dynamic = null, cb:ClientCallData->Void = null):Void {
 		if (!connected())
 			return;
+		if (debug) {
+			trace("发送：", op, data);
+		}
 		switch (mode) {
 			case TEXT:
 				var data = Json.stringify({
@@ -712,7 +778,6 @@ class Client {
 						bytes.set(1 + i, bdata.get(i));
 					}
 					sendData(bytes.getData());
-					trace("BYTES发送长度：", bytes.length);
 				} else {
 					var jsondata = Json.stringify(data);
 					var jsonbyte = Bytes.ofString(jsondata);
@@ -723,7 +788,6 @@ class Client {
 						bytes.set(1 + i, jsonbyte.get(i));
 					}
 					sendData(bytes.getData());
-					trace("BYTES发送长度：", bytes.length);
 				}
 		}
 		if (cb == null)
@@ -787,6 +851,17 @@ class Client {
 		sendClientOp(GetRoomList, {
 			page: page,
 			counts: counts
+		}, cb);
+	}
+
+	/**
+	 * 通过UID获取用户数据
+	 * @param uid 
+	 * @param cb 
+	 */
+	public function getUserDataByUid(uid:Int, cb:ClientCallData->Void):Void {
+		sendClientOp(GetUserDataByUID, {
+			uid: uid
 		}, cb);
 	}
 }

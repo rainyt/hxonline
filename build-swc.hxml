@@ -3,4 +3,5 @@
 --class-path main
 --library colyseus-websocket
 -swf-version 11
+--no-traces
 --main Main
