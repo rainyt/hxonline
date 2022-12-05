@@ -55,6 +55,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var CannelListenerServerMsg = 39; // 取消侦听全服消息
 	var GetUserDataByUID = 40; // 根据UID获取用户数据
 	var GetServerOldMsg = 41; // 获取历史全服消息
+	var ExtendsCall = 42; // 扩展方法调用
 }
 
 enum DataMode {
@@ -862,6 +863,18 @@ class Client {
 	public function getUserDataByUid(uid:Int, cb:ClientCallData->Void):Void {
 		sendClientOp(GetUserDataByUID, {
 			uid: uid
+		}, cb);
+	}
+
+	/**
+	 * 调用扩展方法
+	 * @param uid 
+	 * @param cb 
+	 */
+	public function call(api:String, data:Dynamic, cb:ClientCallData->Void = null):Void {
+		sendClientOp(ExtendsCall, {
+			f: api,
+			d: data
 		}, cb);
 	}
 }

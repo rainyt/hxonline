@@ -54,6 +54,8 @@ class UserUIDData {
 					state: {},
 					name: data.data.name
 				};
+				if (onUserDataUpdate != null)
+					onUserDataUpdate(userdata);
 				dataBindUid.set(userdata.uid, userdata);
 				cb(userdata);
 			} else {
@@ -63,12 +65,16 @@ class UserUIDData {
 		});
 	}
 
+	public static var onUserDataUpdate:ClientData->Void;
+
 	/**
 	 * 缓存用户数据
 	 * @param data 
 	 */
 	public function cacheUserData(data:ClientData):Void {
 		if (data != null && data.uid != null) {
+			if (onUserDataUpdate != null)
+				onUserDataUpdate(data);
 			dataBindUid.set(data.uid, data);
 		}
 	}
