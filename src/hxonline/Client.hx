@@ -137,7 +137,7 @@ class Client {
 	/**
 	 * 回调支持
 	 */
-	private var _opCallBack:Map<OpCode, ClientCallData->Void> = [];
+	private var _opCallBack:Map<OpCode, Array<ClientCallData->Void>> = [];
 
 	/**
 	 * 初始化
@@ -168,6 +168,7 @@ class Client {
 			}
 			#end
 			_socket = null;
+			_opCallBack = [];
 		}
 		#end
 	}
@@ -381,12 +382,13 @@ class Client {
 			default:
 		}
 		if (_opCallBack.exists(opcode)) {
-			_opCallBack.get(opcode)({
-				code: isError ? 1 : 0,
-				data: data,
-				op: opcode
-			});
-			_opCallBack.remove(opcode);
+			var nextCall = _opCallBack.get(opcode).shift();
+			if (nextCall != null)
+				nextCall({
+					code: isError ? 1 : 0,
+					data: data,
+					op: opcode
+				});
 		}
 	}
 
@@ -530,9 +532,11 @@ class Client {
 	/**
 	 * 设置用户状态
 	 * @param data 
-	 * @param cb 
+	 * @param cb 	
 	 */
 	public function setClientState(setData:Dynamic, cb:ClientCallData->Void = null):Void {
+		if (roomData == null)
+			return;
 		sendClientOp(SetClientState, setData, function(data) {
 			if (data.code == 0) {
 				if (roomData != null) {
@@ -791,10 +795,14 @@ class Client {
 					sendData(bytes.getData());
 				}
 		}
-		if (cb == null)
-			_opCallBack.remove(cast cb);
-		else
-			_opCallBack.set(op, cb);
+		if (!_opCallBack.exists(op)) {
+			_opCallBack.set(op, []);
+		}
+		if (cb == null) {
+			_opCallBack.get(op).push(null);
+		} else {
+			_opCallBack.get(op).push(cb);
+		}
 	}
 
 	/**

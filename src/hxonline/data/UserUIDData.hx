@@ -38,13 +38,13 @@ class UserUIDData {
 	 */
 	public function loadUserDataByUid(uid:Int, cb:ClientData->Void, useCache:Bool = false):Void {
 		// 查询缓存对象
-		if (useCache) {
-			var data = getUserDataByUid(uid);
-			if (data != null) {
-				cb(data);
-				return;
-			}
+		// if (useCache) {
+		var data = getUserDataByUid(uid);
+		if (data != null) {
+			cb(data);
+			return;
 		}
+		// }
 		// 通过加载
 		Client.getInstance().getUserDataByUid(uid, (data) -> {
 			if (data.code == 0) {
