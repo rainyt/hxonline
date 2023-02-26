@@ -148,6 +148,9 @@ class Client {
 		trace("[hxonline]init url:" + url, appid);
 		serverUrl = url;
 		serverAppKey = appid;
+		#if ios
+		sys.ssl.Socket.DEFAULT_VERIFY_CERT = false;
+		#end
 	}
 
 	/**
@@ -194,7 +197,7 @@ class Client {
 	 * @param cb 
 	 */
 	public function connect(cb:Bool->Void = null):Void {
-		trace("connecting");
+		trace("connecting", serverUrl);
 		_connectCb = cb;
 		#if js
 		if (_socket != null) {
@@ -249,7 +252,7 @@ class Client {
 				return;
 			}
 		}
-		_socket = WebSocket.create(serverUrl);
+		_socket = WebSocket.create(serverUrl, null, null, false);
 		_socket.onopen = function() {
 			trace("open");
 			if (onConnected != null)
