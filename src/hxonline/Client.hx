@@ -205,12 +205,12 @@ class Client {
 				trace("重复登陆");
 				if (_connectCb != null) {
 					_connectCb(true);
-					_connectCb =	 null;
+					_connectCb = null;
 				}
 				return;
 			}
 		}
-		if(_socket != null){
+		if (_socket != null && _socket.readyState != WebSocket.CLOSED) {
 			_socket.close();
 		}
 		_socket = new WebSocket(serverUrl);
@@ -247,7 +247,7 @@ class Client {
 		}
 		#elseif (cpp || flash)
 		if (_socket != null) {
-			if (_socket.readyState == Open) {
+			if (_socket.readyState == Connecting) {
 				if (_connectCb != null) {
 					_connectCb(true);
 					_connectCb = null;
@@ -255,7 +255,7 @@ class Client {
 				return;
 			}
 		}
-		if(_socket != null){
+		if (_socket != null && _socket.readyState != Closed) {
 			_socket.close();
 		}
 		_socket = WebSocket.create(serverUrl, null, null, false);
@@ -451,7 +451,9 @@ class Client {
 					}
 				});
 			} else {
+				trace("Client.login.fail");
 				if (cb != null) {
+					trace("Client.login.callback");
 					cb({
 						code: -1,
 						op: Login,

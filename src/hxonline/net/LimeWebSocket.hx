@@ -1,5 +1,6 @@
 package hxonline.net;
 
+import haxe.Exception;
 import haxe.MainLoop;
 import haxe.io.Bytes;
 import haxe.net.WebSocket.ReadyState;
@@ -59,6 +60,7 @@ class LimeWebSocket {
 
 	private function __onError(?e:Dynamic):Void {
 		MainLoop.runInMainThread(() -> {
+			_thrad.sendError();
 			if (this.onerror != null)
 				this.onerror(e);
 		});
@@ -66,6 +68,7 @@ class LimeWebSocket {
 
 	private function __onClose(?e:Dynamic):Void {
 		MainLoop.runInMainThread(() -> {
+			_thrad.sendComplete();
 			if (this.onclose != null)
 				this.onclose(e);
 		});
@@ -124,23 +127,23 @@ class LimeWebSocket {
 	public function threadPool_doWork(state:Dynamic):Void {
 		switch (state.type) {
 			case "create":
-				_websocket = haxe.net.WebSocket.create(url, protocols, origin, debug);
+				_websocket = haxe.net.WebSocket.create(url, protocols, origin, true);
 				_websocket.onclose = __onClose;
 				_websocket.onopen = __onOpen;
 				_websocket.onerror = __onError;
 				_websocket.onmessageBytes = __onMessageBytes;
 				_websocket.onmessageString = __onMessageString;
 			case "sendString":
-				if (_websocket != null)
+				if (_websocket != null && _websocket.readyState == Connecting)
 					_websocket.sendString(state.data);
 			case "sendBytes":
-				if (_websocket != null)
+				if (_websocket != null && _websocket.readyState == Connecting)
 					_websocket.sendBytes(state.data);
 			case "process":
-				if (_websocket != null)
-					_websocket.process();
 				if (_websocket.readyState == Closed)
 					return;
+				if (_websocket != null)
+					_websocket.process();
 				MainLoop.runInMainThread(() -> {
 					processLoop();
 				});
