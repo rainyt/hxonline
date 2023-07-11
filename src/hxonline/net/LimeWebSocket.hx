@@ -88,7 +88,6 @@ class LimeWebSocket {
 	}
 
 	public function close():Void {
-		trace("close!", thradId);
 		_thrad.queue({type: "close"});
 	}
 
@@ -144,7 +143,6 @@ class LimeWebSocket {
 					return;
 				if (_websocket.readyState == Closed)
 					return;
-				trace("process", thradId);
 				_websocket.process();
 				MainLoop.runInMainThread(() -> {
 					processLoop();
@@ -157,8 +155,7 @@ class LimeWebSocket {
 	}
 
 	public function threadPool_doComplete(state:Dynamic):Void {
-		//
-		trace("线程结束");
+		trace("[hxonline]Thread Closed.");
 	}
 }
 #end
