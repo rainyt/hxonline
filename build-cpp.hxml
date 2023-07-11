@@ -3,3 +3,4 @@
 --main Main
 --library colyseus-websocket
 --cpp bin/cpp
+--library lime

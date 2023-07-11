@@ -160,7 +160,7 @@ class Client {
 		#if (js || cpp || flash)
 		if (_socket != null) {
 			#if (cpp || flash)
-			if (_socket.readyState == Closed) {
+			if (_socket.readyState != Closed) {
 				trace("[Client]close()");
 				_socket.close();
 			}
@@ -205,10 +205,13 @@ class Client {
 				trace("重复登陆");
 				if (_connectCb != null) {
 					_connectCb(true);
-					_connectCb = null;
+					_connectCb =	 null;
 				}
 				return;
 			}
+		}
+		if(_socket != null){
+			_socket.close();
 		}
 		_socket = new WebSocket(serverUrl);
 		_socket.onopen = function() {
@@ -251,6 +254,9 @@ class Client {
 				}
 				return;
 			}
+		}
+		if(_socket != null){
+			_socket.close();
 		}
 		_socket = WebSocket.create(serverUrl, null, null, false);
 		_socket.onopen = function() {
