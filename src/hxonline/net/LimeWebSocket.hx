@@ -134,16 +134,18 @@ class LimeWebSocket {
 				_websocket.onmessageBytes = __onMessageBytes;
 				_websocket.onmessageString = __onMessageString;
 			case "sendString":
-				if (_websocket != null && _websocket.readyState == Connecting)
+				if (_websocket != null)
 					_websocket.sendString(state.data);
 			case "sendBytes":
-				if (_websocket != null && _websocket.readyState == Connecting)
+				if (_websocket != null)
 					_websocket.sendBytes(state.data);
 			case "process":
+				if (_websocket == null)
+					return;
 				if (_websocket.readyState == Closed)
 					return;
-				if (_websocket != null)
-					_websocket.process();
+				trace("process", thradId);
+				_websocket.process();
 				MainLoop.runInMainThread(() -> {
 					processLoop();
 				});

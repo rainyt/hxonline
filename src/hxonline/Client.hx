@@ -279,7 +279,7 @@ class Client {
 				this.onText(data);
 		}
 		_socket.onerror = function(message) {
-			trace("error:" + message);
+			trace("[Client]onError()" + message);
 			if (_connectCb != null) {
 				_connectCb(false);
 				_connectCb = null;
