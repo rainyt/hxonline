@@ -20,7 +20,10 @@ class LimeWebSocket {
 
 	public var thradId:Int = 0;
 
-	private var _thrad:ThreadPool = new ThreadPool();
+	/**
+	 * 线程管理
+	 */
+	private static var _thrad:ThreadPool;
 
 	private var _websocket:haxe.net.WebSocket;
 
@@ -30,18 +33,38 @@ class LimeWebSocket {
 
 	private var origin:String;
 
-	private var debug:Bool;
+	private static var debug:Bool;
 
 	public function new(url:String, protocols:Array<String> = null, origin:String = null, debug:Bool = false) {
 		thradId = ++_id;
 		this.url = url;
 		this.protocols = protocols;
 		this.origin = origin;
-		this.debug = debug;
-		_thrad.doWork.add(threadPool_doWork);
-		_thrad.onComplete.add(threadPool_doComplete);
-		_thrad.queue({type: "create"});
+		LimeWebSocket.debug = debug;
+		// 测试
+		// LimeWebSocket.debug = true;
+		if (_thrad == null) {
+			// 创建一个独立线程
+			_thrad = new ThreadPool();
+			_thrad.doWork.add(threadPool_doWork);
+			_thrad.onComplete.add(threadPool_doComplete);
+		}
+		queue(CREATE);
 		processLoop();
+	}
+
+	/**
+	 * 向线程发送指令
+	 * @param type 
+	 */
+	private function queue(type:SocketApi, ?data:Dynamic):Void {
+		trace("queue", type, thradId);
+		var stateObj:LimeWebSocketThred = {
+			socket: this,
+			type: type,
+			data: data
+		};
+		_thrad.queue(stateObj);
 	}
 
 	private function __onMessageString(data:String):Void {
@@ -68,7 +91,7 @@ class LimeWebSocket {
 
 	private function __onClose(?e:Dynamic):Void {
 		MainLoop.runInMainThread(() -> {
-			_thrad.sendComplete();
+			// _thrad.sendComplete();
 			if (this.onclose != null)
 				this.onclose(e);
 		});
@@ -78,6 +101,9 @@ class LimeWebSocket {
 		MainLoop.runInMainThread(() -> {
 			if (this.onopen != null)
 				this.onopen();
+			if (_hasOpenGoClose) {
+				this.close();
+			}
 		});
 	}
 
@@ -87,8 +113,15 @@ class LimeWebSocket {
 		return _websocket != null ? _websocket.readyState : Connecting;
 	}
 
+	private var _hasOpenGoClose = false;
+
 	public function close():Void {
-		_thrad.queue({type: "close"});
+		if (this.readyState == Open) {
+			this.queue(CLOSE);
+		} else {
+			// 当发生Open时，进行关闭
+			_hasOpenGoClose = true;
+		}
 	}
 
 	public var onopen:Void->Void;
@@ -100,62 +133,87 @@ class LimeWebSocket {
 	public var onclose:Dynamic->Void;
 
 	public function sendString(data:String):Void {
-		_thrad.queue({
-			type: "sendString",
-			data: data
-		});
+		this.queue(SEND_STRING, data);
 	}
 
 	public function sendBytes(data:Bytes):Void {
-		_thrad.queue({
-			type: "sendBytes",
-			data: data
-		});
+		this.queue(SEND_BYTES, data);
 	}
 
 	public var onerror:Dynamic->Void;
 
 	public function process():Void {
-		// _thrad.queue({type: "process"});
+		// 使用processLoop代替
 	}
 
 	public function processLoop():Void {
-		_thrad.queue({type: "process"});
+		this.queue(PROCESS);
 	}
 
-	public function threadPool_doWork(state:Dynamic):Void {
-		switch (state.type) {
-			case "create":
-				_websocket = haxe.net.WebSocket.create(url, protocols, origin, true);
-				_websocket.onclose = __onClose;
-				_websocket.onopen = __onOpen;
-				_websocket.onerror = __onError;
-				_websocket.onmessageBytes = __onMessageBytes;
-				_websocket.onmessageString = __onMessageString;
-			case "sendString":
+	public static function threadPool_doWork(state:Dynamic):Void {
+		var stateObj:LimeWebSocketThred = state;
+		if (stateObj == null || stateObj.socket == null) {
+			trace("[inval]");
+			return;
+		}
+		var _websocket = stateObj.socket._websocket;
+		if (_websocket != null) {
+			if (_websocket.readyState == Closed) {
+				if (debug)
+					trace("[hxonline]阻止行为" + state.type, stateObj.socket.thradId);
+				return;
+			}
+			if (debug) {
+				trace("[hxonline]", state.type, stateObj.socket.thradId);
+			}
+		}
+		switch (stateObj.type) {
+			case CREATE:
+				_websocket = haxe.net.WebSocket.create(stateObj.socket.url, stateObj.socket.protocols, stateObj.socket.origin, LimeWebSocket.debug);
+				_websocket.onclose = stateObj.socket.__onClose;
+				_websocket.onopen = stateObj.socket.__onOpen;
+				_websocket.onerror = stateObj.socket.__onError;
+				_websocket.onmessageBytes = stateObj.socket.__onMessageBytes;
+				_websocket.onmessageString = stateObj.socket.__onMessageString;
+				stateObj.socket._websocket = _websocket;
+			case SEND_STRING:
 				if (_websocket != null)
-					_websocket.sendString(state.data);
-			case "sendBytes":
+					_websocket.sendString(stateObj.data);
+			case SEND_BYTES:
 				if (_websocket != null)
-					_websocket.sendBytes(state.data);
-			case "process":
+					_websocket.sendBytes(stateObj.data);
+			case PROCESS:
 				if (_websocket == null)
-					return;
-				if (_websocket.readyState == Closed)
 					return;
 				_websocket.process();
 				MainLoop.runInMainThread(() -> {
-					processLoop();
+					stateObj.socket.processLoop();
 				});
-			case "close":
+			case CLOSE:
 				if (_websocket != null)
 					_websocket.close();
-				_thrad.sendComplete();
 		}
 	}
 
-	public function threadPool_doComplete(state:Dynamic):Void {
-		trace("[hxonline]Thread Closed.");
+	public static function threadPool_doComplete(state:Dynamic):Void {
+		if (debug) {
+			var stateObj:LimeWebSocketThred = state;
+			trace("[hxonline]Thread Closed,thradId = " + stateObj.socket.thradId);
+		}
 	}
+}
+
+typedef LimeWebSocketThred = {
+	type:SocketApi,
+	socket:LimeWebSocket,
+	?data:Dynamic
+};
+
+enum abstract SocketApi(String) {
+	var CREATE = "create";
+	var SEND_STRING = "sendString";
+	var SEND_BYTES = "sendBytes";
+	var PROCESS = "process";
+	var CLOSE = "close";
 }
 #end
