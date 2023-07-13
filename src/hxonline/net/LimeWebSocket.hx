@@ -58,7 +58,6 @@ class LimeWebSocket {
 	 * @param type 
 	 */
 	private function queue(type:SocketApi, ?data:Dynamic):Void {
-		trace("queue", type, thradId);
 		var stateObj:LimeWebSocketThred = {
 			socket: this,
 			type: type,
@@ -153,7 +152,6 @@ class LimeWebSocket {
 	public static function threadPool_doWork(state:Dynamic):Void {
 		var stateObj:LimeWebSocketThred = state;
 		if (stateObj == null || stateObj.socket == null) {
-			trace("[inval]");
 			return;
 		}
 		var _websocket = stateObj.socket._websocket;
