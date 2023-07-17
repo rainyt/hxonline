@@ -42,7 +42,7 @@ class LimeWebSocket {
 		this.origin = origin;
 		LimeWebSocket.debug = debug;
 		// 测试
-		// LimeWebSocket.debug = true;
+		LimeWebSocket.debug = true;
 		if (_thrad == null) {
 			// 创建一个独立线程
 			_thrad = new ThreadPool();
@@ -50,7 +50,6 @@ class LimeWebSocket {
 			_thrad.onComplete.add(threadPool_doComplete);
 		}
 		queue(CREATE);
-		processLoop();
 	}
 
 	/**
@@ -161,35 +160,40 @@ class LimeWebSocket {
 					trace("[hxonline]阻止行为" + state.type, stateObj.socket.thradId);
 				return;
 			}
-			if (debug) {
-				trace("[hxonline]", state.type, stateObj.socket.thradId);
-			}
 		}
-		switch (stateObj.type) {
-			case CREATE:
-				_websocket = haxe.net.WebSocket.create(stateObj.socket.url, stateObj.socket.protocols, stateObj.socket.origin, LimeWebSocket.debug);
-				_websocket.onclose = stateObj.socket.__onClose;
-				_websocket.onopen = stateObj.socket.__onOpen;
-				_websocket.onerror = stateObj.socket.__onError;
-				_websocket.onmessageBytes = stateObj.socket.__onMessageBytes;
-				_websocket.onmessageString = stateObj.socket.__onMessageString;
-				stateObj.socket._websocket = _websocket;
-			case SEND_STRING:
-				if (_websocket != null)
-					_websocket.sendString(stateObj.data);
-			case SEND_BYTES:
-				if (_websocket != null)
-					_websocket.sendBytes(stateObj.data);
-			case PROCESS:
-				if (_websocket == null)
-					return;
-				_websocket.process();
-				MainLoop.runInMainThread(() -> {
+		if (debug) {
+			trace("[hxonline]", state.type, stateObj.socket.thradId);
+		}
+		try {
+			switch (stateObj.type) {
+				case CREATE:
+					_websocket = haxe.net.WebSocket.create(stateObj.socket.url, stateObj.socket.protocols, stateObj.socket.origin, LimeWebSocket.debug);
+					_websocket.onclose = stateObj.socket.__onClose;
+					_websocket.onopen = stateObj.socket.__onOpen;
+					_websocket.onerror = stateObj.socket.__onError;
+					_websocket.onmessageBytes = stateObj.socket.__onMessageBytes;
+					_websocket.onmessageString = stateObj.socket.__onMessageString;
+					stateObj.socket._websocket = _websocket;
 					stateObj.socket.processLoop();
-				});
-			case CLOSE:
-				if (_websocket != null)
-					_websocket.close();
+				case SEND_STRING:
+					if (_websocket != null)
+						_websocket.sendString(stateObj.data);
+				case SEND_BYTES:
+					if (_websocket != null)
+						_websocket.sendBytes(stateObj.data);
+				case PROCESS:
+					if (_websocket == null)
+						return;
+					_websocket.process();
+					MainLoop.runInMainThread(() -> {
+						stateObj.socket.processLoop();
+					});
+				case CLOSE:
+					if (_websocket != null)
+						_websocket.close();
+			}
+		} catch (e:Exception) {
+			trace("[hxonline]catch error:", e.message, e.stack);
 		}
 	}
 
