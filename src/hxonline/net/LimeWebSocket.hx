@@ -42,7 +42,7 @@ class LimeWebSocket {
 		this.origin = origin;
 		LimeWebSocket.debug = debug;
 		// 测试
-		LimeWebSocket.debug = true;
+		// LimeWebSocket.debug = true;
 		if (_thrad == null) {
 			// 创建一个独立线程
 			_thrad = new ThreadPool();
