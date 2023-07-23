@@ -56,6 +56,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var GetUserDataByUID = 40; // 根据UID获取用户数据
 	var GetServerOldMsg = 41; // 获取历史全服消息
 	var ExtendsCall = 42; // 扩展方法调用
+	var CannelMatchUser = 43; // 取消匹配用户
 }
 
 enum DataMode {
@@ -75,7 +76,7 @@ class Client {
 	/**
 	 * 调试模式
 	 */
-	public static var debug:Bool = true;
+	public static var debug:Bool = false;
 
 	private static var _instance:Client;
 
@@ -350,6 +351,15 @@ class Client {
 			case ExitRoom:
 				roomData = null;
 			case MatchUser:
+			case Matched:
+				if (_matchCallBack != null) {
+					_matchCallBack({
+						code: isError ? 1 : 0,
+						data: data,
+						op: opcode
+					});
+					_matchCallBack = null;
+				}
 			case UpdateUserData:
 			case UpdateRoomUserData:
 				if (roomData != null) {
@@ -730,11 +740,29 @@ class Client {
 	}
 
 	/**
+	 * 匹配回调
+	 */
+	private var _matchCallBack:ClientCallData->Void;
+
+	/**
 	 * 匹配用户
 	 * @param cb 
 	 */
 	public function matchUser(option:MatchOption, cb:ClientCallData->Void) {
-		sendClientOp(MatchUser, option, cb);
+		_matchCallBack = cb;
+		sendClientOp(MatchUser, option, function(data:ClientCallData) {
+			if (data.code != 0) {
+				_matchCallBack(data);
+			}
+		});
+	}
+
+	/**
+	 * 取消匹配用户行为
+	 * @param cb 
+	 */
+	public function cannelMathUser(cb:ClientCallData->Void) {
+		sendClientOp(MatchUser, CannelMatchUser, cb);
 	}
 
 	/**
