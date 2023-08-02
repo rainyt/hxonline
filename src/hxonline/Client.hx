@@ -57,6 +57,8 @@ enum abstract OpCode(Int) from Int to Int {
 	var GetServerOldMsg = 41; // 获取历史全服消息
 	var ExtendsCall = 42; // 扩展方法调用
 	var CannelMatchUser = 43; // 取消匹配用户
+	var SendToUser = 44; // 给某个用户发送独立消息
+	var UserMessage = 45; // 接收到用户的独立消息
 }
 
 enum DataMode {
@@ -494,6 +496,19 @@ class Client {
 	 */
 	public function sendRoomMessage(data:Dynamic, cb:ClientCallData->Void = null):Void {
 		sendClientOp(RoomMessage, data, cb);
+	}
+
+	/**
+	 * 发送消息给指定的用户
+	 * @param uid 
+	 * @param data 
+	 * @param cb 
+	 */
+	public function sendUserMessage(uid:Int, data:Dynamic, cb:ClientCallData->Void = null):Void {
+		sendClientOp(SendToUser, {
+			uid: uid,
+			data: data
+		}, cb);
 	}
 
 	/**
