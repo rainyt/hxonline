@@ -35,16 +35,17 @@ class UserUIDData {
 	 * 通过UID加载用户数据，如果用户数据无法被加载时，则返回null
 	 * @param uid 
 	 * @param cb 
+	 * @param useCache 是否使用缓存，默认为true
 	 */
-	public function loadUserDataByUid(uid:Int, cb:ClientData->Void, useCache:Bool = false):Void {
+	public function loadUserDataByUid(uid:Int, cb:ClientData->Void, useCache:Bool = true):Void {
 		// 查询缓存对象
-		// if (useCache) {
-		var data = getUserDataByUid(uid);
-		if (data != null) {
-			cb(data);
-			return;
+		if (useCache) {
+			var data = getUserDataByUid(uid);
+			if (data != null) {
+				cb(data);
+				return;
+			}
 		}
-		// }
 		// 通过加载
 		Client.getInstance().getUserDataByUid(uid, (data) -> {
 			if (data.code == 0) {
