@@ -194,8 +194,12 @@ class LimeWebSocket {
 			}
 		} catch (e:Exception) {
 			trace("[hxonline]catch error:", e.message, e.stack);
-			if (_websocket != null)
-				_websocket.close();
+			try {
+				if (_websocket != null)
+					_websocket.close();
+			} catch (e:Exception) {
+				trace("[hxonline]catch close error:", e.message, e.stack);
+			}
 		}
 	}
 

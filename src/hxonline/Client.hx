@@ -259,6 +259,7 @@ class Client {
 			}
 		}
 		if (_socket != null && _socket.readyState != Closed) {
+			_socket.onclose = null;
 			_socket.close();
 		}
 		_socket = WebSocket.create(serverUrl, null, null, false);
@@ -276,10 +277,16 @@ class Client {
 				this.onBytes(data);
 		}
 		_socket.onmessageString = function(data) {
-			if (onMessageEvent != null)
-				this.onMessageEvent(Json.parse(data));
-			if (onText != null)
-				this.onText(data);
+			try {
+				if (onMessageEvent != null)
+					this.onMessageEvent(Json.parse(data));
+				if (onText != null)
+					this.onText(data);
+			} catch (e:Exception) {
+				#if openfl
+				@:privateAccess openfl.Lib.current.stage.__handleError(e);
+				#end
+			}
 		}
 		_socket.onerror = function(message) {
 			trace("[Client]onError()" + message);
