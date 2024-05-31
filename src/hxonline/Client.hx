@@ -489,7 +489,7 @@ class Client {
 	 * @param cb 
 	 */
 	public function updateUserData(data:Dynamic, cb:ClientCallData->Void = null):Void {
-		if (roomData != null) {
+		if (roomData != null && roomData.self != null) {
 			this.updateData(roomData.self.data, data);
 			UserUIDData.getInstance().cacheUserData(roomData.self);
 		}
@@ -661,7 +661,7 @@ class Client {
 	 * @return Bool
 	 */
 	public function isMatser():Bool {
-		if (roomData != null) {
+		if (roomData != null && roomData.self != null) {
 			return roomData.master.uid == roomData.self.uid;
 		}
 		return false;
