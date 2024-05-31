@@ -582,7 +582,7 @@ class Client {
 			return;
 		sendClientOp(SetClientState, setData, function(data) {
 			if (data.code == 0) {
-				if (roomData != null) {
+				if (roomData != null && roomData.self != null) {
 					this.updateData(roomData.self.state, setData);
 				}
 			}
