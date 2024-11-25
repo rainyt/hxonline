@@ -1,5 +1,6 @@
 package hxonline;
 
+import openfl.Lib;
 import hxonline.data.UserUIDData;
 import haxe.Exception;
 import hxonline.data.MatchOption;
@@ -226,14 +227,20 @@ class Client {
 			}
 		};
 		_socket.onmessage = function(data:MessageEvent) {
-			if (data.data is String) {
-				if (onMessageEvent != null)
-					this.onMessageEvent(Json.parse(data.data));
-				if (onText != null)
-					this.onText(data.data);
-			} else {
-				if (onBytes != null)
-					this.onBytes(data.data);
+			try {
+				if (data.data is String) {
+					if (onMessageEvent != null)
+						this.onMessageEvent(Json.parse(data.data));
+					if (onText != null)
+						this.onText(data.data);
+				} else {
+					if (onBytes != null)
+						this.onBytes(data.data);
+				}
+			} catch (e:Exception) {
+				#if openfl
+				@:privateAccess Lib.current.stage.__handleError(e);
+				#end
 			}
 		}
 		_socket.onerror = function() {
@@ -264,7 +271,6 @@ class Client {
 		}
 		_socket = WebSocket.create(serverUrl, null, null, false);
 		_socket.onopen = function() {
-			trace("open");
 			if (onConnected != null)
 				onConnected();
 			if (_connectCb != null) {
@@ -273,8 +279,14 @@ class Client {
 			}
 		};
 		_socket.onmessageBytes = function(data) {
-			if (onBytes != null)
-				this.onBytes(data);
+			try {
+				if (onBytes != null)
+					this.onBytes(data);
+			} catch (e:Exception) {
+				#if openfl
+				@:privateAccess Lib.current.stage.__handleError(e);
+				#end
+			}
 		}
 		_socket.onmessageString = function(data) {
 			try {
