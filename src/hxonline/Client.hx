@@ -1,6 +1,8 @@
 package hxonline;
 
+#if openfl
 import openfl.Lib;
+#end
 import hxonline.data.UserUIDData;
 import haxe.Exception;
 import hxonline.data.MatchOption;
@@ -60,6 +62,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var CannelMatchUser = 43; // 取消匹配用户
 	var SendToUser = 44; // 给某个用户发送独立消息
 	var UserMessage = 45; // 接收到用户的独立消息
+	var QueryRoomList = 46; // 根据房间ID查询房间数据
 }
 
 enum DataMode {
@@ -712,6 +715,17 @@ class Client {
 			return counts == roomData.users.length;
 		}
 		return false;
+	}
+
+	/**
+	 * 根据房间ID获得房间数据
+	 * @param roomid 
+	 * @param cb 
+	 */
+	public function getQueryRoomList(roomids:Array<Int>, cb:ClientCallData->Void) {
+		sendClientOp(QueryRoomList, {
+			roomids: roomids
+		}, cb);
 	}
 
 	/**
