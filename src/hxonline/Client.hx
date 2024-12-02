@@ -370,6 +370,10 @@ class Client {
 							break;
 						}
 					}
+					if (roomData.master.uid == data.uid) {
+						// 如果是房主退出了，则需要更新整个房间数据
+						this.getRoomData((data) -> {});
+					}
 				}
 			case OutOnlineRoomClient:
 			case ExitRoom:
@@ -675,7 +679,19 @@ class Client {
 	 * 当前状态，自已是否房主
 	 * @return Bool
 	 */
+	@:deprecated("isMatser is deprecated, use isMaster instead.")
 	public function isMatser():Bool {
+		if (roomData != null && roomData.self != null) {
+			return roomData.master.uid == roomData.self.uid;
+		}
+		return false;
+	}
+
+	/**
+	 * 当前状态，自已是否房主
+	 * @return Bool
+	 */
+	public function isMaster():Bool {
 		if (roomData != null && roomData.self != null) {
 			return roomData.master.uid == roomData.self.uid;
 		}
@@ -732,7 +748,7 @@ class Client {
 	 * 获取房间信息
 	 * @param cb 
 	 */
-	public function getRoomData(cb:ClientCallData->Void):Void {
+	public function getRoomData(cb:ClientCallData->Void = null):Void {
 		if (cb != null)
 			sendClientOp(GetRoomData, null, function(data) {
 				if (data.code == 0) {
