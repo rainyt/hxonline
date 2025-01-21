@@ -62,7 +62,6 @@ class LimeWebSocket2 {
 		var isClosed = false;
 		var isError = false;
 		websocket.onclose = (?e) -> {
-			trace("[hxonline]websocket close");
 			isClosed = true;
 			workOut.sendProgress({
 				socket: state.socket,
@@ -70,7 +69,6 @@ class LimeWebSocket2 {
 			});
 		}
 		websocket.onopen = () -> {
-			trace("[hxonline]websocket open");
 			workOut.sendProgress({
 				socket: state.socket,
 				type: OPEN
@@ -78,7 +76,6 @@ class LimeWebSocket2 {
 		}
 		websocket.onerror = (e) -> {
 			isError = true;
-			trace("[hxonline]websocket error:", e);
 			workOut.sendProgress({
 				socket: state.socket,
 				type: ERROR
@@ -99,9 +96,8 @@ class LimeWebSocket2 {
 			});
 		}
 		try {
-			while (true) {
-				if (!isError && !isClosed)
-					websocket.process();
+			while (websocket.readyState != Closed) {
+				websocket.process();
 			}
 		} catch (e:Exception) {
 			trace("[hxonline]catch error:", e.message, e.stack);
@@ -122,7 +118,7 @@ class LimeWebSocket2 {
 	public var onclose:Dynamic->Void;
 
 	public function sendString(data:String):Void {
-		trace("sendString", data);
+		// trace("sendString", data);
 		__thrad.run(threadPool_sendData, {
 			type: SEND_STRING,
 			socket: this,
@@ -131,7 +127,7 @@ class LimeWebSocket2 {
 	}
 
 	public function sendBytes(data:Bytes):Void {
-		trace("sendBytes", data);
+		// trace("sendBytes", data);
 		__thrad.run(threadPool_sendData, {
 			type: SEND_BYTES,
 			socket: this,
@@ -178,15 +174,12 @@ class LimeWebSocket2 {
 				if (state.socket.onopen != null)
 					state.socket.onopen();
 			case SEND_STRING:
-				trace("[hxonline]sendString", state.data);
 				if (state.socket.onmessageString != null)
 					state.socket.onmessageString(state.data);
 			case SEND_BYTES:
-				trace("[hxonline]sendBytes", state.data);
 				if (state.socket.onmessageBytes != null)
 					state.socket.onmessageBytes(state.data);
 			case PROCESS:
-				trace("[hxonline]process");
 			case CLOSE:
 				trace("[hxonline]close");
 				if (state.socket.onclose != null)
@@ -199,8 +192,8 @@ class LimeWebSocket2 {
 	}
 
 	public static function threadPool_doComplete(state:Dynamic):Void {
-		var data:LimeWebSocket2State = state;
-		trace("hxonline states:", state);
+		// var data:LimeWebSocket2State = state;
+		// trace("hxonline states:", state);
 	}
 }
 
