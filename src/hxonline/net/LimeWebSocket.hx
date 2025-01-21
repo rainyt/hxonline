@@ -206,9 +206,7 @@ class LimeWebSocket {
 						return;
 					_websocket.process();
 					MainLoop.runInMainThread(() -> {
-						Timer.delay(() -> {
-							stateObj.socket.processLoop();
-						}, 16);
+						stateObj.socket.processLoop();
 					});
 				case CLOSE:
 					if (_websocket != null)
