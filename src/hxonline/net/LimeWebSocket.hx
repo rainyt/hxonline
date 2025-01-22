@@ -1,6 +1,5 @@
 package hxonline.net;
 
-import haxe.Timer;
 import sys.thread.Thread;
 import haxe.Exception;
 import haxe.MainLoop;
@@ -48,15 +47,8 @@ class LimeWebSocket {
 		if (_thrad == null) {
 			// 创建一个独立线程
 			_thrad = new ThreadPool();
-			_thrad.maxThreads = 3;
-			#if (lime >= "8.2.0")
 			_thrad.doWork.add(threadPool_doWork);
 			_thrad.onComplete.add(threadPool_doComplete);
-			// _thrad.run();
-			#else
-			_thrad.doWork.add(threadPool_doWork);
-			_thrad.onComplete.add(threadPool_doComplete);
-			#end
 		}
 		queue(CREATE);
 	}
@@ -71,18 +63,7 @@ class LimeWebSocket {
 			type: type,
 			data: data
 		};
-		#if (lime >= "8.2.0")
-		if (ThreadPool.isMainThread()) {
-			_thrad.run(null, stateObj);
-		} else {
-			MainLoop.runInMainThread(() -> {
-				// trace("[hxonline]Thread run", type, data);
-				_thrad.run(null, stateObj);
-			});
-		}
-		#else
 		_thrad.queue(stateObj);
-		#end
 	}
 
 	private function __onMessageString(data:String):Void {
@@ -205,9 +186,7 @@ class LimeWebSocket {
 					if (_websocket == null)
 						return;
 					_websocket.process();
-					MainLoop.runInMainThread(() -> {
-						stateObj.socket.processLoop();
-					});
+					stateObj.socket.processLoop();
 				case CLOSE:
 					if (_websocket != null)
 						_websocket.close();
@@ -226,6 +205,7 @@ class LimeWebSocket {
 	public static function threadPool_doComplete(state:Dynamic):Void {
 		if (debug) {
 			var stateObj:LimeWebSocketThred = state;
+			trace("[hxonline]Thread Closed,thradId = " + stateObj.socket.thradId);
 		}
 	}
 }
