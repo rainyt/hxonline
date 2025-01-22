@@ -1,6 +1,5 @@
 package hxonline.net;
 
-import sys.thread.Thread;
 import haxe.Exception;
 import haxe.MainLoop;
 import haxe.io.Bytes;
@@ -186,7 +185,9 @@ class LimeWebSocket {
 					if (_websocket == null)
 						return;
 					_websocket.process();
-					stateObj.socket.processLoop();
+					MainLoop.runInMainThread(() -> {
+						stateObj.socket.processLoop();
+					});
 				case CLOSE:
 					if (_websocket != null)
 						_websocket.close();
