@@ -18,7 +18,7 @@ class LimeWebSocket2 {
 	/**
 	 * 调试信息
 	 */
-	public static var debug:Bool = false;
+	public static var debug:Bool = true;
 
 	private var url:String;
 
@@ -57,7 +57,8 @@ class LimeWebSocket2 {
 	}
 
 	public static function onWebSocketWork(state:LimeWebSocket2State, workOut:WorkOutput):Void {
-		var websocket = haxe.net.WebSocket.create(state.socket.url, state.socket.protocols, state.socket.origin, LimeWebSocket2.debug);
+		// LimeWebSocket2.debug
+		var websocket = haxe.net.WebSocket.create(state.socket.url, state.socket.protocols, state.socket.origin, true);
 		state.socket._websocket = websocket;
 		var isClosed = false;
 		var isError = false;
@@ -118,7 +119,6 @@ class LimeWebSocket2 {
 	public var onclose:Dynamic->Void;
 
 	public function sendString(data:String):Void {
-		// trace("sendString", data);
 		__thrad.run(threadPool_sendData, {
 			type: SEND_STRING,
 			socket: this,
@@ -127,7 +127,6 @@ class LimeWebSocket2 {
 	}
 
 	public function sendBytes(data:Bytes):Void {
-		// trace("sendBytes", data);
 		__thrad.run(threadPool_sendData, {
 			type: SEND_BYTES,
 			socket: this,
@@ -165,6 +164,19 @@ class LimeWebSocket2 {
 			default:
 		}
 		work.sendComplete();
+	}
+
+	/**
+		Returns whether the caller called this function from the main thread.
+	**/
+	public static inline function isMainThread():Bool {
+		#if (html5 && lime_threads)
+		return !lime._internal.backend.html5.HTML5Thread.current().isWorker();
+		#elseif (haxe4 && lime_threads)
+		return sys.thread.Thread.current() == @:privateAccess ThreadPool.__mainThread;
+		#else
+		return true;
+		#end
 	}
 
 	public static function threadPool_doProgress(state:LimeWebSocket2State):Void {
