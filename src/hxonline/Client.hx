@@ -701,9 +701,12 @@ class Client {
 	/**
 	 * 锁定房间，锁定后，外面的人将无法加入
 	 * @param cb 
+	 * @param allowMaterExit 允许房主退出
 	 */
-	public function lockRoom(cb:ClientCallData->Void = null):Void {
-		sendClientOp(LockRoom, null, cb);
+	public function lockRoom(cb:ClientCallData->Void = null, allowMaterExit:Bool = false):Void {
+		sendClientOp(LockRoom, {
+			allowMaterExit: allowMaterExit
+		}, cb);
 	}
 
 	/**
