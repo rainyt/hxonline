@@ -11,7 +11,8 @@ typedef RoomData = {
 	master:ClientData,
 	self:ClientData,
 	users:Array<ClientData>,
-	usersState:Dynamic
+	usersState:Dynamic,
+	lock:Null<Bool>
 }
 
 /**

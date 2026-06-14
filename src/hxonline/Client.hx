@@ -37,7 +37,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var UpdateRoomCustomData = 18; // 更新房间的自定义数据
 	var UpdateRoomOption = 19; // 更新房间的参数，如人数、密码
 	var KickOut = 20; // 将玩家踢出房间
-	var SelfKickOut = 21; // 自已被踢出房间
+	var SelfKickOut = 21; // 自己被踢出房间
 	var GetFrameAt = 22; // 获取指定帧范围的帧事件
 	var SetRoomState = 23; // 设置房间状态数据
 	var RoomStateUpdate = 24; // 房间状态更新
@@ -63,6 +63,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var SendToUser = 44; // 给某个用户发送独立消息
 	var UserMessage = 45; // 接收到用户的独立消息
 	var QueryRoomList = 46; // 根据房间ID查询房间数据
+	var StopFrameSyncWithoutUnlock = 47; // 停止帧同步但不解锁房间（用于回合重置）
 }
 
 enum DataMode {
@@ -151,10 +152,10 @@ class Client {
 	 * @param url 
 	 * @param appkey 
 	 */
-	public function init(url:String, appid:String):Void {
-		trace("[hxonline]init url:" + url, appid);
+	public function init(url:String, appkey:String):Void {
+		trace("[hxonline]init url:" + url, appkey);
 		serverUrl = url;
-		serverAppKey = appid;
+		serverAppKey = appkey;
 		#if ios
 		sys.ssl.Socket.DEFAULT_VERIFY_CERT = false;
 		#end
@@ -220,44 +221,12 @@ class Client {
 		if (_socket != null && _socket.readyState != WebSocket.CLOSED) {
 			_socket.close();
 		}
-		_socket = new WebSocket(serverUrl);
-		_socket.onopen = function() {
-			if (onConnected != null)
-				onConnected();
-			if (_connectCb != null) {
-				_connectCb(true);
-				_connectCb = null;
-			}
-		};
-		_socket.onmessage = function(data:MessageEvent) {
-			try {
-				if (data.data is String) {
-					if (onMessageEvent != null)
-						this.onMessageEvent(Json.parse(data.data));
-					if (onText != null)
-						this.onText(data.data);
-				} else {
-					if (onBytes != null)
-						this.onBytes(data.data);
-				}
-			} catch (e:Exception) {
-				#if openfl
-				@:privateAccess Lib.current.stage.__handleError(e);
-				#end
-			}
-		}
-		_socket.onerror = function() {
-			if (_connectCb != null) {
-				_connectCb(false);
-				_connectCb = null;
-			}
-		}
-		_socket.onclose = function() {
-			trace("[Client]onClosed()");
-			roomData = null;
-			if (onClose != null)
-				this.onClose();
-		}
+		
+		// FRP内网穿透时需要先发送HTTP请求来"热身"连接通道
+		// 这对于樱花frp等穿透服务是必要的
+		doHttpWarmUp(function() {
+			createWebSocket();
+		});
 		#elseif (cpp || flash)
 		if (_socket != null) {
 			if (_socket.readyState == Connecting) {
@@ -318,6 +287,91 @@ class Client {
 		}
 		#end
 	}
+
+	#if js
+	/**
+	 * FRP穿透Warm-up：尝试多种方式激活隧道
+	 */
+	private function doHttpWarmUp(onComplete:Void->Void):Void {
+		// 方法1: 转换ws://为http://发HTTP请求
+		var httpUrl = convertWsToHttp(serverUrl);
+		trace("[Client] HTTP warm-up尝试: " + httpUrl);
+		
+		var warmUpReq = new js.html.XMLHttpRequest();
+		warmUpReq.open("GET", httpUrl, true);
+		warmUpReq.timeout = 5000;
+		warmUpReq.onload = function() {
+			trace("[Client] HTTP warm-up完成, 状态:", warmUpReq.status);
+			onComplete();
+		};
+		warmUpReq.onerror = function() {
+			trace("[Client] HTTP warm-up失败, 继续...");
+			onComplete();
+		};
+		warmUpReq.ontimeout = function() {
+			trace("[Client] HTTP warm-up超时, 继续...");
+			onComplete();
+		};
+		warmUpReq.send();
+	}
+
+	/**
+	 * 将ws://或wss:// URL转换为http://或https://
+	 */
+	private function convertWsToHttp(wsUrl:String):String {
+		if (wsUrl == null) return wsUrl;
+		if (wsUrl.length >= 6 && wsUrl.substr(0, 6) == "wss://") {
+			return "https://" + wsUrl.substr(6);
+		} else if (wsUrl.length >= 5 && wsUrl.substr(0, 5) == "ws://") {
+			return "http://" + wsUrl.substr(5);
+		}
+		return wsUrl;
+	}
+
+	/**
+	 * 创建WebSocket连接（JS平台）
+	 */
+	private function createWebSocket():Void {
+		_socket = new js.html.WebSocket(serverUrl);
+		_socket.onopen = function() {
+			if (onConnected != null)
+				onConnected();
+			if (_connectCb != null) {
+				_connectCb(true);
+				_connectCb = null;
+			}
+		};
+		_socket.onmessage = function(data:MessageEvent) {
+			try {
+				if (data.data is String) {
+					if (onMessageEvent != null)
+						this.onMessageEvent(Json.parse(data.data));
+					if (onText != null)
+						this.onText(data.data);
+				} else {
+					if (onBytes != null)
+						this.onBytes(data.data);
+				}
+			} catch (e:Exception) {
+				#if openfl
+				@:privateAccess Lib.current.stage.__handleError(e);
+				#end
+			}
+		}
+		_socket.onerror = function() {
+			if (_connectCb != null) {
+				_connectCb(false);
+				_connectCb = null;
+			}
+		}
+		_socket.onclose = function() {
+			trace("[Client]onClosed()");
+			roomData = null;
+			if (onClose != null)
+				this.onClose();
+		}
+	}
+	#end
 
 	public function process():Void {
 		#if (cpp || flash)
@@ -437,6 +491,8 @@ class Client {
 					op: opcode
 				});
 		}
+		if (onOpMessage != null)
+			this.onOpMessage(opcode, data);
 	}
 
 	/**
@@ -464,8 +520,6 @@ class Client {
 				trace(Json.stringify(data));
 		}
 		callOp(opcode, data.data);
-		if (onOpMessage != null)
-			this.onOpMessage(opcode, data.data);
 	}
 
 	/**
@@ -628,6 +682,14 @@ class Client {
 	}
 
 	/**
+	 * 停止帧同步但不解锁房间（用于回合重置）
+	 * @param cb 
+	 */
+	public function stopFrameSyncWithoutUnlock(cb:ClientCallData->Void = null):Void {
+		sendClientOp(StopFrameSyncWithoutUnlock, null, cb);
+	}
+
+	/**
 	 * 创建房间
 	 * @param cb 
 	 */
@@ -676,7 +738,7 @@ class Client {
 	}
 
 	/**
-	 * 当前状态，自已是否房主
+	 * 当前状态，自己是否房主
 	 * @return Bool
 	 */
 	@:deprecated("isMatser is deprecated, use isMaster instead.")
@@ -688,7 +750,7 @@ class Client {
 	}
 
 	/**
-	 * 当前状态，自已是否房主
+	 * 当前状态，自己是否房主
 	 * @return Bool
 	 */
 	public function isMaster():Bool {
@@ -756,7 +818,7 @@ class Client {
 			sendClientOp(GetRoomData, null, function(data) {
 				if (data.code == 0) {
 					roomData = data.data;
-					// 定位是自已的用户数据
+					// 定位是自己的用户数据
 					var list:Array<Dynamic> = data.data.users;
 					for (index => value in list) {
 						var state:Dynamic = Reflect.getProperty(data.data.usersState, value.uid);
@@ -770,7 +832,23 @@ class Client {
 				cb(data);
 			});
 		else
-			sendClientOp(GetRoomData);
+			sendClientOp(GetRoomData, null, function(data) {
+				if (data.code == 0) {
+					roomData = data.data;
+					// 定位是自己的用户数据
+					if (data.data != null && data.data.users != null) {
+						var list:Array<Dynamic> = data.data.users;
+						for (index => value in list) {
+							var state:Dynamic = Reflect.getProperty(data.data.usersState, value.uid);
+							value.state = state == null ? {} : state;
+							if (value.uid == this.uid) {
+								data.data.self = value;
+							}
+							UserUIDData.getInstance().cacheUserData(value);
+						}
+					}
+				}
+			});
 	}
 
 	/**
@@ -828,8 +906,8 @@ class Client {
 	 * 取消匹配用户行为
 	 * @param cb 
 	 */
-	public function cannelMathUser(cb:ClientCallData->Void) {
-		sendClientOp(MatchUser, CannelMatchUser, cb);
+	public function cannelMatchUser(cb:ClientCallData->Void) {
+		sendClientOp(CannelMatchUser, null, cb);
 	}
 
 	/**
@@ -914,31 +992,31 @@ class Client {
 	/**
 	 * 连接成功
 	 */
-	dynamic public function onConnected():Void {}
+	public var onConnected:Void->Void;
 
 	/**
 	 * 连接断开
 	 */
-	dynamic public function onClose():Void {}
+	public var onClose:Void->Void;
 
 	/**
 	 * 文本数据
 	 * @param text 
 	 */
-	dynamic public function onText(text:String):Void {}
+	public var onText:String->Void;
 
 	/**
 	 * 二进制数据
 	 * @param bytes 
 	 */
-	dynamic public function onBytes(bytes:Bytes):Void {}
+	public var onBytes:Bytes->Void;
 
 	/**
 	 * 操作Op数据
 	 * @param op 
 	 * @param data 
 	 */
-	dynamic public function onOpMessage(op:OpCode, data:Dynamic):Void {}
+	public var onOpMessage:OpCode->Dynamic->Void;
 
 	/**
 	 * 获取UID在users里的索引
