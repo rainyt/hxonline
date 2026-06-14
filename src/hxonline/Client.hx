@@ -63,6 +63,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var SendToUser = 44; // 给某个用户发送独立消息
 	var UserMessage = 45; // 接收到用户的独立消息
 	var QueryRoomList = 46; // 根据房间ID查询房间数据
+	var StopFrameSyncWithoutUnlock = 47; // 停止帧同步但不解锁房间（用于回合重置）
 }
 
 enum DataMode {
@@ -828,8 +829,8 @@ class Client {
 	 * 取消匹配用户行为
 	 * @param cb 
 	 */
-	public function cannelMathUser(cb:ClientCallData->Void) {
-		sendClientOp(MatchUser, CannelMatchUser, cb);
+	public function cannelMatchUser(cb:ClientCallData->Void) {
+		sendClientOp(CannelMatchUser, null, cb);
 	}
 
 	/**
@@ -990,5 +991,13 @@ class Client {
 			f: api,
 			d: data
 		}, cb);
+	}
+
+	/**
+	 * 停止帧同步但不解锁房间（用于回合重置）
+	 * @param cb 
+	 */
+	public function stopFrameSyncWithoutUnlock(cb:ClientCallData->Void = null):Void {
+		sendClientOp(StopFrameSyncWithoutUnlock, null, cb);
 	}
 }
