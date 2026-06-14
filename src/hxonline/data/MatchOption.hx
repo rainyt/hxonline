@@ -6,7 +6,9 @@ typedef MatchOption = {
 	// 匹配人数
 	number:Int,
 	// 匹配权重
-	range:Dynamic<MatchRange>
+	range:Dynamic<MatchRange>,
+	// FPS
+	?fps:Int,
 }
 
 typedef MatchRange = {

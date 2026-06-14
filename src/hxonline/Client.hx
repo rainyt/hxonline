@@ -631,9 +631,12 @@ class Client {
 	/**
 	 * 创建房间
 	 * @param cb 
+	 * @param fps 帧同步的帧率，默认30帧每秒
 	 */
-	public function createRoom(cb:ClientCallData->Void):Void {
-		sendClientOp(CreateRoom, null, cb);
+	public function createRoom(cb:ClientCallData->Void, fps:Int = 30):Void {
+		sendClientOp(CreateRoom, {
+			fps: fps
+		}, cb);
 	}
 
 	/**
