@@ -22,5 +22,6 @@ typedef ClientData = {
 	uid:Null<Int>,
 	name:String,
 	data:Dynamic,
-	state:Dynamic
+	state:Dynamic,
+	?seat:Int
 }

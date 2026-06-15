@@ -430,7 +430,7 @@ class Client {
 						}
 					}
 			case SeatUpdate:
-				// 座位变更通知，更新本地seats数据
+				// 座位变更通知，更新本地seats映射和用户data中的seat
 				if (roomData != null && data != null) {
 					if (roomData.seats == null) {
 						roomData.seats = {};
@@ -442,6 +442,13 @@ class Client {
 					// 设置新座位映射
 					if (data.newSeat != null && data.newSeat != 0) {
 						Reflect.setField(roomData.seats, Std.string(data.newSeat), data.uid);
+					}
+					// 同步更新users中对应玩家的data.seat
+					for (user in roomData.users) {
+						if (user.uid == data.uid) {
+							user.seat = data.newSeat;
+							break;
+						}
 					}
 				}
 			default:
