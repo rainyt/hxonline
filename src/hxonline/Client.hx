@@ -53,9 +53,9 @@ enum abstract OpCode(Int) from Int to Int {
 	var UpdateRoomUserData = 34; // 更新房间用户数据
 	var GetRoomList = 35; // 获取房间列表
 	var SendServerMsg = 36; // 发送全服消息
-	var GetServerMsg = 37; // 接收到全服消息
-	var ListenerServerMsg = 38; // 侦听全服消息
-	var CannelListenerServerMsg = 39; // 取消侦听全服消息
+	var EVENT_GetServerMsg = 37; // 订阅事件：接收到全服消息
+	var ListenerServer = 38; // 订阅通知
+	var CannelListenerServer = 39; // 取消订阅
 	var GetUserDataByUID = 40; // 根据UID获取用户数据
 	var GetServerOldMsg = 41; // 获取历史全服消息
 	var ExtendsCall = 42; // 扩展方法调用
@@ -66,6 +66,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var StopFrameSyncWithoutUnlock = 47; // 停止帧同步但不解锁房间（用于回合重置）
 	var SwitchSeat = 48; // 换位请求
 	var SeatUpdate = 49; // 座位变更通知
+	var EVENT_RoomListChanged = 50; // 订阅事件：房间列表变更
 }
 
 enum DataMode {
@@ -583,19 +584,43 @@ class Client {
 	}
 
 	/**
+	 * 订阅服务端事件
+	 * @param eventOp 要订阅的事件OP（如 EVENT_GetServerMsg, EVENT_RoomListChanged）
+	 * @param cb
+	 */
+	public function listenerServer(eventOp:OpCode, cb:ClientCallData->Void = null):Void {
+		sendClientOp(ListenerServer, {
+			op: eventOp
+		}, cb);
+	}
+
+	/**
+	 * 取消订阅服务端事件
+	 * @param eventOp 要取消的事件OP（如 EVENT_GetServerMsg, EVENT_RoomListChanged）
+	 * @param cb
+	 */
+	public function cannelListenerServer(eventOp:OpCode, cb:ClientCallData->Void = null):Void {
+		sendClientOp(CannelListenerServer, {
+			op: eventOp
+		}, cb);
+	}
+
+	/**
 	 * 侦听全服消息
 	 * @param cb 
 	 */
+	@:deprecated("listenerServerMessage is deprecated, use listenerServer(EVENT_GetServerMsg, cb) instead.")
 	public function listenerServerMessage(cb:ClientCallData->Void = null):Void {
-		sendClientOp(ListenerServerMsg, null, cb);
+		listenerServer(EVENT_GetServerMsg, cb);
 	}
 
 	/**
 	 * 取消侦听全服消息
 	 * @param cb 
 	 */
+	@:deprecated("removeServerMessage is deprecated, use cannelListenerServer(EVENT_GetServerMsg, cb) instead.")
 	public function removeServerMessage(cb:ClientCallData->Void = null):Void {
-		sendClientOp(CannelListenerServerMsg, null, cb);
+		cannelListenerServer(EVENT_GetServerMsg, cb);
 	}
 
 	/**
