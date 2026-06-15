@@ -64,6 +64,8 @@ enum abstract OpCode(Int) from Int to Int {
 	var UserMessage = 45; // 接收到用户的独立消息
 	var QueryRoomList = 46; // 根据房间ID查询房间数据
 	var StopFrameSyncWithoutUnlock = 47; // 停止帧同步但不解锁房间（用于回合重置）
+	var SwitchSeat = 48; // 换位请求
+	var SeatUpdate = 49; // 座位变更通知
 }
 
 enum DataMode {
@@ -427,6 +429,21 @@ class Client {
 							break;
 						}
 					}
+			case SeatUpdate:
+				// 座位变更通知，更新本地seats数据
+				if (roomData != null && data != null) {
+					if (roomData.seats == null) {
+						roomData.seats = {};
+					}
+					// 移除旧座位映射
+					if (data.oldSeat != null && data.oldSeat != 0) {
+						Reflect.deleteField(roomData.seats, Std.string(data.oldSeat));
+					}
+					// 设置新座位映射
+					if (data.newSeat != null && data.newSeat != 0) {
+						Reflect.setField(roomData.seats, Std.string(data.newSeat), data.uid);
+					}
+				}
 			default:
 		}
 		if (_opCallBack.exists(opcode)) {
@@ -1002,5 +1019,16 @@ class Client {
 	 */
 	public function stopFrameSyncWithoutUnlock(cb:ClientCallData->Void = null):Void {
 		sendClientOp(StopFrameSyncWithoutUnlock, null, cb);
+	}
+
+	/**
+	 * 请求换座位
+	 * @param seat 目标座位号（1-based）
+	 * @param cb
+	 */
+	public function switchSeat(seat:Int, cb:ClientCallData->Void = null):Void {
+		sendClientOp(SwitchSeat, {
+			seat: seat
+		}, cb);
 	}
 }
