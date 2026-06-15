@@ -37,7 +37,7 @@ enum abstract OpCode(Int) from Int to Int {
 	var UpdateRoomCustomData = 18; // 更新房间的自定义数据
 	var UpdateRoomOption = 19; // 更新房间的参数，如人数、密码
 	var KickOut = 20; // 将玩家踢出房间
-	var SelfKickOut = 21; // 自己被踢出房间
+	var SelfKickOut = 21; // 自已被踢出房间
 	var GetFrameAt = 22; // 获取指定帧范围的帧事件
 	var SetRoomState = 23; // 设置房间状态数据
 	var RoomStateUpdate = 24; // 房间状态更新
@@ -53,9 +53,9 @@ enum abstract OpCode(Int) from Int to Int {
 	var UpdateRoomUserData = 34; // 更新房间用户数据
 	var GetRoomList = 35; // 获取房间列表
 	var SendServerMsg = 36; // 发送全服消息
-	var GetServerMsg = 37; // 接收到全服消息
-	var ListenerServerMsg = 38; // 侦听全服消息
-	var CannelListenerServerMsg = 39; // 取消侦听全服消息
+	var EVENT_GetServerMsg = 37; // 订阅事件：接收到全服消息
+	var ListenerServer = 38; // 订阅通知
+	var CannelListenerServer = 39; // 取消订阅
 	var GetUserDataByUID = 40; // 根据UID获取用户数据
 	var GetServerOldMsg = 41; // 获取历史全服消息
 	var ExtendsCall = 42; // 扩展方法调用
@@ -64,6 +64,9 @@ enum abstract OpCode(Int) from Int to Int {
 	var UserMessage = 45; // 接收到用户的独立消息
 	var QueryRoomList = 46; // 根据房间ID查询房间数据
 	var StopFrameSyncWithoutUnlock = 47; // 停止帧同步但不解锁房间（用于回合重置）
+	var SwitchSeat = 48; // 换位请求
+	var SeatUpdate = 49; // 座位变更通知
+	var EVENT_RoomListChanged = 50; // 订阅事件：房间列表变更
 }
 
 enum DataMode {
@@ -152,10 +155,10 @@ class Client {
 	 * @param url 
 	 * @param appkey 
 	 */
-	public function init(url:String, appkey:String):Void {
-		trace("[hxonline]init url:" + url, appkey);
+	public function init(url:String, appid:String):Void {
+		trace("[hxonline]init url:" + url, appid);
 		serverUrl = url;
-		serverAppKey = appkey;
+		serverAppKey = appid;
 		#if ios
 		sys.ssl.Socket.DEFAULT_VERIFY_CERT = false;
 		#end
@@ -221,12 +224,44 @@ class Client {
 		if (_socket != null && _socket.readyState != WebSocket.CLOSED) {
 			_socket.close();
 		}
-		
-		// FRP内网穿透时需要先发送HTTP请求来"热身"连接通道
-		// 这对于樱花frp等穿透服务是必要的
-		doHttpWarmUp(function() {
-			createWebSocket();
-		});
+		_socket = new WebSocket(serverUrl);
+		_socket.onopen = function() {
+			if (onConnected != null)
+				onConnected();
+			if (_connectCb != null) {
+				_connectCb(true);
+				_connectCb = null;
+			}
+		};
+		_socket.onmessage = function(data:MessageEvent) {
+			try {
+				if (data.data is String) {
+					if (onMessageEvent != null)
+						this.onMessageEvent(Json.parse(data.data));
+					if (onText != null)
+						this.onText(data.data);
+				} else {
+					if (onBytes != null)
+						this.onBytes(data.data);
+				}
+			} catch (e:Exception) {
+				#if openfl
+				@:privateAccess Lib.current.stage.__handleError(e);
+				#end
+			}
+		}
+		_socket.onerror = function() {
+			if (_connectCb != null) {
+				_connectCb(false);
+				_connectCb = null;
+			}
+		}
+		_socket.onclose = function() {
+			trace("[Client]onClosed()");
+			roomData = null;
+			if (onClose != null)
+				this.onClose();
+		}
 		#elseif (cpp || flash)
 		if (_socket != null) {
 			if (_socket.readyState == Connecting) {
@@ -287,91 +322,6 @@ class Client {
 		}
 		#end
 	}
-
-	#if js
-	/**
-	 * FRP穿透Warm-up：尝试多种方式激活隧道
-	 */
-	private function doHttpWarmUp(onComplete:Void->Void):Void {
-		// 方法1: 转换ws://为http://发HTTP请求
-		var httpUrl = convertWsToHttp(serverUrl);
-		trace("[Client] HTTP warm-up尝试: " + httpUrl);
-		
-		var warmUpReq = new js.html.XMLHttpRequest();
-		warmUpReq.open("GET", httpUrl, true);
-		warmUpReq.timeout = 5000;
-		warmUpReq.onload = function() {
-			trace("[Client] HTTP warm-up完成, 状态:", warmUpReq.status);
-			onComplete();
-		};
-		warmUpReq.onerror = function() {
-			trace("[Client] HTTP warm-up失败, 继续...");
-			onComplete();
-		};
-		warmUpReq.ontimeout = function() {
-			trace("[Client] HTTP warm-up超时, 继续...");
-			onComplete();
-		};
-		warmUpReq.send();
-	}
-
-	/**
-	 * 将ws://或wss:// URL转换为http://或https://
-	 */
-	private function convertWsToHttp(wsUrl:String):String {
-		if (wsUrl == null) return wsUrl;
-		if (wsUrl.length >= 6 && wsUrl.substr(0, 6) == "wss://") {
-			return "https://" + wsUrl.substr(6);
-		} else if (wsUrl.length >= 5 && wsUrl.substr(0, 5) == "ws://") {
-			return "http://" + wsUrl.substr(5);
-		}
-		return wsUrl;
-	}
-
-	/**
-	 * 创建WebSocket连接（JS平台）
-	 */
-	private function createWebSocket():Void {
-		_socket = new js.html.WebSocket(serverUrl);
-		_socket.onopen = function() {
-			if (onConnected != null)
-				onConnected();
-			if (_connectCb != null) {
-				_connectCb(true);
-				_connectCb = null;
-			}
-		};
-		_socket.onmessage = function(data:MessageEvent) {
-			try {
-				if (data.data is String) {
-					if (onMessageEvent != null)
-						this.onMessageEvent(Json.parse(data.data));
-					if (onText != null)
-						this.onText(data.data);
-				} else {
-					if (onBytes != null)
-						this.onBytes(data.data);
-				}
-			} catch (e:Exception) {
-				#if openfl
-				@:privateAccess Lib.current.stage.__handleError(e);
-				#end
-			}
-		}
-		_socket.onerror = function() {
-			if (_connectCb != null) {
-				_connectCb(false);
-				_connectCb = null;
-			}
-		}
-		_socket.onclose = function() {
-			trace("[Client]onClosed()");
-			roomData = null;
-			if (onClose != null)
-				this.onClose();
-		}
-	}
-	#end
 
 	public function process():Void {
 		#if (cpp || flash)
@@ -480,6 +430,28 @@ class Client {
 							break;
 						}
 					}
+			case SeatUpdate:
+				// 座位变更通知，更新本地seats映射和用户data中的seat
+				if (roomData != null && data != null) {
+					if (roomData.seats == null) {
+						roomData.seats = {};
+					}
+					// 移除旧座位映射
+					if (data.oldSeat != null && data.oldSeat != 0) {
+						Reflect.deleteField(roomData.seats, Std.string(data.oldSeat));
+					}
+					// 设置新座位映射
+					if (data.newSeat != null && data.newSeat != 0) {
+						Reflect.setField(roomData.seats, Std.string(data.newSeat), data.uid);
+					}
+					// 同步更新users中对应玩家的data.seat
+					for (user in roomData.users) {
+						if (user.uid == data.uid) {
+							user.seat = data.newSeat;
+							break;
+						}
+					}
+				}
 			default:
 		}
 		if (_opCallBack.exists(opcode)) {
@@ -491,8 +463,6 @@ class Client {
 					op: opcode
 				});
 		}
-		if (onOpMessage != null)
-			this.onOpMessage(opcode, data);
 	}
 
 	/**
@@ -520,6 +490,8 @@ class Client {
 				trace(Json.stringify(data));
 		}
 		callOp(opcode, data.data);
+		if (onOpMessage != null)
+			this.onOpMessage(opcode, data.data);
 	}
 
 	/**
@@ -612,19 +584,43 @@ class Client {
 	}
 
 	/**
+	 * 订阅服务端事件
+	 * @param eventOp 要订阅的事件OP（如 EVENT_GetServerMsg, EVENT_RoomListChanged）
+	 * @param cb
+	 */
+	public function listenerServer(eventOp:OpCode, cb:ClientCallData->Void = null):Void {
+		sendClientOp(ListenerServer, {
+			op: eventOp
+		}, cb);
+	}
+
+	/**
+	 * 取消订阅服务端事件
+	 * @param eventOp 要取消的事件OP（如 EVENT_GetServerMsg, EVENT_RoomListChanged）
+	 * @param cb
+	 */
+	public function cannelListenerServer(eventOp:OpCode, cb:ClientCallData->Void = null):Void {
+		sendClientOp(CannelListenerServer, {
+			op: eventOp
+		}, cb);
+	}
+
+	/**
 	 * 侦听全服消息
 	 * @param cb 
 	 */
+	@:deprecated("listenerServerMessage is deprecated, use listenerServer(EVENT_GetServerMsg, cb) instead.")
 	public function listenerServerMessage(cb:ClientCallData->Void = null):Void {
-		sendClientOp(ListenerServerMsg, null, cb);
+		listenerServer(EVENT_GetServerMsg, cb);
 	}
 
 	/**
 	 * 取消侦听全服消息
 	 * @param cb 
 	 */
+	@:deprecated("removeServerMessage is deprecated, use cannelListenerServer(EVENT_GetServerMsg, cb) instead.")
 	public function removeServerMessage(cb:ClientCallData->Void = null):Void {
-		sendClientOp(CannelListenerServerMsg, null, cb);
+		cannelListenerServer(EVENT_GetServerMsg, cb);
 	}
 
 	/**
@@ -682,19 +678,14 @@ class Client {
 	}
 
 	/**
-	 * 停止帧同步但不解锁房间（用于回合重置）
-	 * @param cb 
-	 */
-	public function stopFrameSyncWithoutUnlock(cb:ClientCallData->Void = null):Void {
-		sendClientOp(StopFrameSyncWithoutUnlock, null, cb);
-	}
-
-	/**
 	 * 创建房间
 	 * @param cb 
+	 * @param fps 帧同步的帧率，默认30帧每秒
 	 */
-	public function createRoom(cb:ClientCallData->Void):Void {
-		sendClientOp(CreateRoom, null, cb);
+	public function createRoom(cb:ClientCallData->Void, fps:Int = 30):Void {
+		sendClientOp(CreateRoom, {
+			fps: fps
+		}, cb);
 	}
 
 	/**
@@ -738,7 +729,7 @@ class Client {
 	}
 
 	/**
-	 * 当前状态，自己是否房主
+	 * 当前状态，自已是否房主
 	 * @return Bool
 	 */
 	@:deprecated("isMatser is deprecated, use isMaster instead.")
@@ -750,7 +741,7 @@ class Client {
 	}
 
 	/**
-	 * 当前状态，自己是否房主
+	 * 当前状态，自已是否房主
 	 * @return Bool
 	 */
 	public function isMaster():Bool {
@@ -818,7 +809,7 @@ class Client {
 			sendClientOp(GetRoomData, null, function(data) {
 				if (data.code == 0) {
 					roomData = data.data;
-					// 定位是自己的用户数据
+					// 定位是自已的用户数据
 					var list:Array<Dynamic> = data.data.users;
 					for (index => value in list) {
 						var state:Dynamic = Reflect.getProperty(data.data.usersState, value.uid);
@@ -832,23 +823,7 @@ class Client {
 				cb(data);
 			});
 		else
-			sendClientOp(GetRoomData, null, function(data) {
-				if (data.code == 0) {
-					roomData = data.data;
-					// 定位是自己的用户数据
-					if (data.data != null && data.data.users != null) {
-						var list:Array<Dynamic> = data.data.users;
-						for (index => value in list) {
-							var state:Dynamic = Reflect.getProperty(data.data.usersState, value.uid);
-							value.state = state == null ? {} : state;
-							if (value.uid == this.uid) {
-								data.data.self = value;
-							}
-							UserUIDData.getInstance().cacheUserData(value);
-						}
-					}
-				}
-			});
+			sendClientOp(GetRoomData);
 	}
 
 	/**
@@ -992,31 +967,31 @@ class Client {
 	/**
 	 * 连接成功
 	 */
-	public var onConnected:Void->Void;
+	dynamic public function onConnected():Void {}
 
 	/**
 	 * 连接断开
 	 */
-	public var onClose:Void->Void;
+	dynamic public function onClose():Void {}
 
 	/**
 	 * 文本数据
 	 * @param text 
 	 */
-	public var onText:String->Void;
+	dynamic public function onText(text:String):Void {}
 
 	/**
 	 * 二进制数据
 	 * @param bytes 
 	 */
-	public var onBytes:Bytes->Void;
+	dynamic public function onBytes(bytes:Bytes):Void {}
 
 	/**
 	 * 操作Op数据
 	 * @param op 
 	 * @param data 
 	 */
-	public var onOpMessage:OpCode->Dynamic->Void;
+	dynamic public function onOpMessage(op:OpCode, data:Dynamic):Void {}
 
 	/**
 	 * 获取UID在users里的索引
@@ -1067,6 +1042,25 @@ class Client {
 		sendClientOp(ExtendsCall, {
 			f: api,
 			d: data
+		}, cb);
+	}
+
+	/**
+	 * 停止帧同步但不解锁房间（用于回合重置）
+	 * @param cb 
+	 */
+	public function stopFrameSyncWithoutUnlock(cb:ClientCallData->Void = null):Void {
+		sendClientOp(StopFrameSyncWithoutUnlock, null, cb);
+	}
+
+	/**
+	 * 请求换座位
+	 * @param seat 目标座位号（1-based）
+	 * @param cb
+	 */
+	public function switchSeat(seat:Int, cb:ClientCallData->Void = null):Void {
+		sendClientOp(SwitchSeat, {
+			seat: seat
 		}, cb);
 	}
 }

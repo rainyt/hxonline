@@ -12,7 +12,7 @@ typedef RoomData = {
 	self:ClientData,
 	users:Array<ClientData>,
 	usersState:Dynamic,
-	lock:Null<Bool>
+	seats:Dynamic
 }
 
 /**
@@ -22,5 +22,6 @@ typedef ClientData = {
 	uid:Null<Int>,
 	name:String,
 	data:Dynamic,
-	state:Dynamic
+	state:Dynamic,
+	?seat:Int
 }

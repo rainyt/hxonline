@@ -1,7 +1,6 @@
 package hxonline.data;
 
 import hxonline.data.RoomData.ClientData;
-import hxonline.Client;
 
 /**
  * 缓存UID用户数据使用

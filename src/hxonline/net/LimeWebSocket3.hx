@@ -81,6 +81,10 @@ class LimeWebSocket3 {
 			}
 			try {
 				while (websocket.readyState != Closed) {
+					if (game.worlds.GameWorld.currentWorld != null && game.worlds.GameWorld.currentWorld.nowTime > 5) {
+						trace("send sendData stop");
+						continue;
+					}
 					websocket.process();
 				}
 			} catch (e:Exception) {
